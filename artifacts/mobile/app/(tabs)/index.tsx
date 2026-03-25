@@ -18,6 +18,7 @@ import { G, Line, Polyline, Svg, Text as SvgText } from "react-native-svg";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import Colors from "@/constants/colors";
+import { FREE_TRADE_LIMIT } from "@/constants/storage";
 import { useSettings } from "@/hooks/useSettings";
 
 const SCREEN_W = Dimensions.get("window").width;
@@ -686,7 +687,7 @@ export default function JournalScreen() {
         <Pressable
           style={({ pressed }) => [styles.addBtn, { opacity: pressed ? 0.7 : 1 }]}
           onPress={() => {
-            if (trades.length >= 5) {
+            if (trades.length >= FREE_TRADE_LIMIT) {
               router.push("/paywall");
             } else {
               router.push("/(tabs)/add");

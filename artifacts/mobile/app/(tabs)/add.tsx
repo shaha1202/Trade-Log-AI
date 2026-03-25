@@ -26,6 +26,7 @@ import Animated, {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import Colors from "@/constants/colors";
+import { FREE_TRADE_LIMIT } from "@/constants/storage";
 import { useSettings } from "@/hooks/useSettings";
 
 const TIMEFRAMES = ["M1", "M5", "M15", "M30", "H1", "H4", "D1", "W1"];
@@ -296,8 +297,6 @@ function TagChip({
     </Pressable>
   );
 }
-
-const FREE_TRADE_LIMIT = 5;
 
 export default function AddTradeScreen() {
   const insets = useSafeAreaInsets();

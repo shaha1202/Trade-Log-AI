@@ -27,16 +27,16 @@ const PLANS: {
   {
     id: "monthly",
     label: "Monthly",
-    price: "$9.9",
+    price: "$9.99",
     period: "per month",
-    perMonth: "$9.9 / mo",
+    perMonth: "$9.99 / mo",
   },
   {
     id: "quarterly",
     label: "Quarterly",
-    price: "$24.9",
+    price: "$24.99",
     period: "every 3 months",
-    perMonth: "$8.3 / mo",
+    perMonth: "$8.33 / mo",
   },
   {
     id: "yearly",
