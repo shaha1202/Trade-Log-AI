@@ -790,7 +790,6 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   insightCard: {
-    marginHorizontal: 16,
     marginBottom: 10,
     backgroundColor: Colors.tealDim,
     borderRadius: 16,
