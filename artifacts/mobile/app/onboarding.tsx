@@ -1,9 +1,10 @@
 import { Feather } from "@expo/vector-icons";
 import { useCreateTrade } from "@workspace/api-client-react";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as Haptics from "expo-haptics";
 import * as ImagePicker from "expo-image-picker";
 import { router } from "expo-router";
-import React, { useRef, useState } from "react";
+import React, { useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -13,28 +14,26 @@ import {
   ScrollView,
   StyleSheet,
   Text,
-  TextInput,
   View,
 } from "react-native";
 import Animated, {
-  Easing,
   useAnimatedStyle,
   useSharedValue,
   withRepeat,
-  withSequence,
   withTiming,
+  Easing,
 } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 
 import Colors from "@/constants/colors";
+import { ONBOARDING_KEY } from "@/constants/storage";
 
 const SCREEN_W = Dimensions.get("window").width;
-const ONBOARDING_KEY = "tradelog_onboarding_done";
 
 type AnalysisResult = {
   asset?: string;
   timeframe?: string;
+  session?: string;
   direction?: string;
   entry?: number | null;
   stopLoss?: number | null;
@@ -43,83 +42,74 @@ type AnalysisResult = {
   narrative?: string;
 };
 
-type Step = "welcome" | "upload" | "analyzing" | "preview" | "manual";
+type Step = "upload" | "analyzing" | "result" | "error";
 
-function ScanAnimation() {
-  const translateY = useSharedValue(0);
-  const opacity = useSharedValue(1);
+function PulsingRing() {
+  const scale = useSharedValue(1);
+  const opacity = useSharedValue(0.8);
 
   React.useEffect(() => {
-    translateY.value = withRepeat(
-      withSequence(
-        withTiming(80, { duration: 900, easing: Easing.inOut(Easing.ease) }),
-        withTiming(0, { duration: 900, easing: Easing.inOut(Easing.ease) })
-      ),
+    scale.value = withRepeat(
+      withTiming(1.35, { duration: 1000, easing: Easing.out(Easing.ease) }),
       -1,
-      false
+      true
     );
     opacity.value = withRepeat(
-      withSequence(
-        withTiming(0.2, { duration: 900 }),
-        withTiming(1, { duration: 900 })
-      ),
+      withTiming(0.15, { duration: 1000, easing: Easing.out(Easing.ease) }),
       -1,
-      false
+      true
     );
-  }, [translateY, opacity]);
+  }, [scale, opacity]);
 
-  const animStyle = useAnimatedStyle(() => ({
-    transform: [{ translateY: translateY.value }],
+  const ringStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: scale.value }],
     opacity: opacity.value,
   }));
 
   return (
-    <View style={styles.scanWrap}>
-      <View style={styles.scanBox}>
-        <Animated.View style={[styles.scanLine, animStyle]} />
-        <View style={styles.scanCornerTL} />
-        <View style={styles.scanCornerTR} />
-        <View style={styles.scanCornerBL} />
-        <View style={styles.scanCornerBR} />
+    <View style={styles.pulseWrap}>
+      <Animated.View style={[styles.pulseRingOuter, ringStyle]} />
+      <View style={styles.pulseRingInner}>
+        <Feather name="cpu" size={32} color={Colors.teal} />
       </View>
-      <Text style={styles.scanLabel}>Analyzing chart with AI...</Text>
-      <Text style={styles.scanSub}>Claude Vision is reading your trade setup</Text>
     </View>
   );
 }
 
-function DataRow({ label, value, isAI }: { label: string; value: string; isAI?: boolean }) {
+function DataRow({ label, value }: { label: string; value: string }) {
+  const isEmpty = value === "—";
   return (
     <View style={styles.dataRow}>
       <Text style={styles.dataLabel}>{label}</Text>
-      <View style={styles.dataRight}>
-        {isAI && (
-          <View style={styles.aiChip}>
-            <Feather name="cpu" size={8} color={Colors.teal} />
-            <Text style={styles.aiChipText}>AI</Text>
-          </View>
-        )}
-        <Text style={[styles.dataValue, value === "—" && { color: Colors.textMuted }]}>{value}</Text>
-      </View>
+      <Text style={[styles.dataValue, isEmpty && { color: Colors.textMuted }]}>
+        {value}
+      </Text>
     </View>
   );
 }
 
 export default function OnboardingScreen() {
   const insets = useSafeAreaInsets();
-  const [step, setStep] = useState<Step>("welcome");
+  const [step, setStep] = useState<Step>("upload");
   const [imageUri, setImageUri] = useState<string | null>(null);
   const [analysis, setAnalysis] = useState<AnalysisResult | null>(null);
-  const [asset, setAsset] = useState("");
-  const [direction, setDirection] = useState<"long" | "short">("long");
-  const [result, setResult] = useState<"win" | "loss" | "breakeven" | "">("");
-  const [pnl, setPnl] = useState("");
   const { mutateAsync: createTrade, isPending } = useCreateTrade();
 
-  const handlePickImage = async () => {
+  const topPad = insets.top + 8;
+  const bottomPad = insets.bottom + 24;
+
+  const handleSkip = async () => {
+    await AsyncStorage.setItem(ONBOARDING_KEY, "1");
+    router.replace("/(tabs)/");
+  };
+
+  const pickFromLibrary = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== "granted") {
-      Alert.alert("Permission needed", "Please allow photo library access to upload charts.");
+      Alert.alert(
+        "Permission needed",
+        "Please allow photo library access to upload charts."
+      );
       return;
     }
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -135,19 +125,22 @@ export default function OnboardingScreen() {
     }
   };
 
-  const handleCamera = async () => {
+  const pickFromCamera = async () => {
     const { status } = await ImagePicker.requestCameraPermissionsAsync();
     if (status !== "granted") {
-      Alert.alert("Permission needed", "Please allow camera access to take chart photos.");
+      Alert.alert(
+        "Permission needed",
+        "Please allow camera access to take chart photos."
+      );
       return;
     }
-    const r = await ImagePicker.launchCameraAsync({
+    const result = await ImagePicker.launchCameraAsync({
       allowsEditing: false,
       quality: 0.8,
       base64: true,
     });
-    if (!r.canceled && r.assets[0]) {
-      const asset = r.assets[0];
+    if (!result.canceled && result.assets[0]) {
+      const asset = result.assets[0];
       setImageUri(asset.uri);
       await analyzeImage(asset.base64!, asset.mimeType ?? "image/jpeg");
     }
@@ -157,59 +150,57 @@ export default function OnboardingScreen() {
     setStep("analyzing");
     try {
       const mediaType =
-        mimeType === "image/png" ? "image/png"
-        : mimeType === "image/gif" ? "image/gif"
-        : mimeType === "image/webp" ? "image/webp"
-        : "image/jpeg";
+        mimeType === "image/png"
+          ? "image/png"
+          : mimeType === "image/gif"
+          ? "image/gif"
+          : mimeType === "image/webp"
+          ? "image/webp"
+          : "image/jpeg";
 
-      const resp = await fetch(`https://${process.env.EXPO_PUBLIC_DOMAIN}/api/trades/analyze`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ imageBase64: base64, mediaType }),
-      });
+      const resp = await fetch(
+        `https://${process.env.EXPO_PUBLIC_DOMAIN}/api/trades/analyze`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ imageBase64: base64, mediaType }),
+        }
+      );
 
       if (resp.ok) {
         const data = await resp.json();
         setAnalysis(data);
-        setAsset(data.asset ?? "");
-        setDirection((data.direction as "long" | "short") ?? "long");
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-        setStep("preview");
+        setStep("result");
       } else {
-        setAnalysis(null);
-        setStep("manual");
+        setStep("error");
       }
     } catch {
-      setAnalysis(null);
-      setStep("manual");
+      setStep("error");
     }
   };
 
   const handleSave = async () => {
-    const assetVal = (analysis?.asset ?? asset).trim().toUpperCase();
-    if (!assetVal) {
-      Alert.alert("Required", "Please enter the asset/pair.");
-      return;
-    }
+    if (!analysis) return;
     try {
       await createTrade({
         data: {
-          asset: assetVal,
-          timeframe: analysis?.timeframe ?? "H1",
-          session: null,
-          direction: (analysis?.direction as "long" | "short") ?? direction,
-          entry: analysis?.entry ?? null,
-          stopLoss: analysis?.stopLoss ?? null,
-          takeProfit: analysis?.takeProfit ?? null,
+          asset: (analysis.asset ?? "UNKNOWN").trim().toUpperCase(),
+          timeframe: analysis.timeframe ?? "H1",
+          session: analysis.session ?? null,
+          direction: (analysis.direction as "long" | "short") ?? "long",
+          entry: analysis.entry ?? null,
+          stopLoss: analysis.stopLoss ?? null,
+          takeProfit: analysis.takeProfit ?? null,
           rr: null,
           lotSize: null,
           riskPct: null,
-          pnl: pnl ? parseFloat(pnl) : null,
+          pnl: null,
           holdDuration: null,
-          result: result || null,
-          htfTrend: analysis?.htfTrend ?? null,
+          result: null,
+          htfTrend: analysis.htfTrend ?? null,
           confluences: [],
-          aiNarrative: analysis?.narrative ?? null,
+          aiNarrative: analysis.narrative ?? null,
           checklistDirectionAligned: false,
           checklistMinConfluences: false,
           checklistRr: false,
@@ -221,107 +212,61 @@ export default function OnboardingScreen() {
           didWell: null,
           toImprove: null,
           screenshotUrl: null,
-          aiAnalyzed: analysis != null,
+          aiAnalyzed: true,
         },
       });
       await AsyncStorage.setItem(ONBOARDING_KEY, "1");
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       router.replace("/(tabs)/");
     } catch {
-      Alert.alert("Error", "Failed to save. Please try again.");
+      Alert.alert("Error", "Failed to save trade. Please try again.");
     }
   };
-
-  const handleSkip = async () => {
-    await AsyncStorage.setItem(ONBOARDING_KEY, "1");
-    router.replace("/(tabs)/");
-  };
-
-  const topPad = insets.top + 16;
-
-  if (step === "welcome") {
-    return (
-      <View style={[styles.screen, { paddingTop: topPad }]}>
-        <Pressable style={styles.skipBtn} onPress={handleSkip}>
-          <Text style={styles.skipText}>Skip</Text>
-        </Pressable>
-        <View style={styles.welcomeContent}>
-          <View style={styles.welcomeIconWrap}>
-            <Text style={styles.welcomeIcon}>📈</Text>
-          </View>
-          <Text style={styles.welcomeTitle}>Welcome to TradeLog</Text>
-          <Text style={styles.welcomeSub}>
-            The AI-powered trading journal that learns from your charts.
-          </Text>
-          <View style={styles.featureList}>
-            {[
-              { icon: "cpu", text: "AI reads your chart screenshots instantly" },
-              { icon: "bar-chart-2", text: "Track every trade with detailed analytics" },
-              { icon: "trending-up", text: "Spot patterns and improve your edge" },
-            ].map((f) => (
-              <View key={f.text} style={styles.featureRow}>
-                <View style={styles.featureIconWrap}>
-                  <Feather name={f.icon as never} size={16} color={Colors.teal} />
-                </View>
-                <Text style={styles.featureText}>{f.text}</Text>
-              </View>
-            ))}
-          </View>
-          <Pressable
-            style={({ pressed }) => [styles.primaryBtn, { opacity: pressed ? 0.8 : 1 }]}
-            onPress={() => setStep("upload")}
-          >
-            <Feather name="camera" size={18} color={Colors.bg} />
-            <Text style={styles.primaryBtnText}>Log Your First Trade</Text>
-          </Pressable>
-          <Pressable onPress={handleSkip} style={styles.ghostBtn}>
-            <Text style={styles.ghostBtnText}>I'll set it up later</Text>
-          </Pressable>
-        </View>
-      </View>
-    );
-  }
 
   if (step === "upload") {
     return (
       <View style={[styles.screen, { paddingTop: topPad }]}>
-        <View style={styles.stepHeader}>
-          <Pressable onPress={() => setStep("welcome")} style={styles.backBtn}>
-            <Feather name="arrow-left" size={20} color={Colors.textSecondary} />
-          </Pressable>
-          <Text style={styles.stepTitle}>Upload a Chart</Text>
-          <Pressable onPress={handleSkip} style={styles.skipBtn2}>
+        <View style={styles.topBar}>
+          <View style={{ width: 48 }} />
+          <Pressable onPress={handleSkip} style={styles.skipBtn}>
             <Text style={styles.skipText}>Skip</Text>
           </Pressable>
         </View>
-        <View style={styles.uploadContent}>
-          <View style={styles.uploadIllustration}>
-            <Feather name="image" size={64} color={Colors.tealDim} />
-            <Text style={styles.uploadTitle}>AI Chart Analysis</Text>
-            <Text style={styles.uploadDesc}>
-              Upload a screenshot of any trade chart and Claude AI will auto-fill the asset, direction, entries, and setup details.
+
+        <View style={styles.uploadBody}>
+          <View style={styles.uploadIconWrap}>
+            <Text style={styles.uploadEmoji}>📈</Text>
+          </View>
+          <Text style={styles.uploadTitle}>Upload your first trade</Text>
+          <Text style={styles.uploadHint}>
+            We'll analyze your chart automatically
+          </Text>
+
+          <Pressable
+            style={({ pressed }) => [
+              styles.bigUploadBtn,
+              { opacity: pressed ? 0.85 : 1 },
+            ]}
+            onPress={pickFromLibrary}
+          >
+            <View style={styles.bigUploadCircle}>
+              <Feather name="camera" size={36} color={Colors.bg} />
+            </View>
+            <Text style={styles.bigUploadLabel}>Upload Chart</Text>
+            <Text style={styles.bigUploadSub}>
+              Photo library or camera
             </Text>
-          </View>
-          <View style={styles.uploadBtns}>
-            <Pressable
-              style={({ pressed }) => [styles.uploadBtn, { opacity: pressed ? 0.8 : 1 }]}
-              onPress={handlePickImage}
-            >
-              <Feather name="image" size={28} color={Colors.teal} />
-              <Text style={styles.uploadBtnLabel}>Photo Library</Text>
-              <Text style={styles.uploadBtnSub}>Upload from gallery</Text>
-            </Pressable>
-            <Pressable
-              style={({ pressed }) => [styles.uploadBtn, { opacity: pressed ? 0.8 : 1 }]}
-              onPress={handleCamera}
-            >
-              <Feather name="camera" size={28} color={Colors.teal} />
-              <Text style={styles.uploadBtnLabel}>Camera</Text>
-              <Text style={styles.uploadBtnSub}>Take a photo</Text>
-            </Pressable>
-          </View>
-          <Pressable onPress={() => setStep("manual")} style={styles.manualLink}>
-            <Text style={styles.manualLinkText}>Enter details manually instead →</Text>
+          </Pressable>
+
+          <Pressable
+            onPress={pickFromCamera}
+            style={({ pressed }) => [
+              styles.cameraAltBtn,
+              { opacity: pressed ? 0.7 : 1 },
+            ]}
+          >
+            <Feather name="aperture" size={16} color={Colors.teal} />
+            <Text style={styles.cameraAltText}>Use camera instead</Text>
           </Pressable>
         </View>
       </View>
@@ -330,130 +275,104 @@ export default function OnboardingScreen() {
 
   if (step === "analyzing") {
     return (
-      <View style={[styles.screen, { paddingTop: topPad }]}>
-        <Text style={styles.stepTitle2}>Reading Your Chart</Text>
+      <View style={[styles.screen, styles.analyzeScreen, { paddingTop: topPad }]}>
         {imageUri && (
           <Image
             source={{ uri: imageUri }}
-            style={styles.analyzeImage}
+            style={styles.analyzeThumb}
             resizeMode="cover"
           />
         )}
-        <ScanAnimation />
-        <Text style={styles.analyzeSub}>
-          Claude Vision is identifying the asset, direction, entries, and market structure...
-        </Text>
+        <PulsingRing />
+        <Text style={styles.analyzeTitle}>Analyzing your trade...</Text>
+        <Text style={styles.analyzeSub}>Extracting setup and insights</Text>
       </View>
     );
   }
 
-  if (step === "preview") {
-    const dir = (analysis?.direction ?? direction) as "long" | "short";
+  if (step === "result" && analysis) {
+    const dir = (analysis.direction ?? "long") as "long" | "short";
     const dirColor = dir === "long" ? Colors.green : Colors.red;
     const dirBg = dir === "long" ? Colors.greenMuted : Colors.redMuted;
 
     return (
       <ScrollView
         style={[styles.screen, { paddingTop: topPad }]}
-        contentContainerStyle={{ paddingBottom: insets.bottom + 32 }}
+        contentContainerStyle={[styles.resultScroll, { paddingBottom: bottomPad }]}
         showsVerticalScrollIndicator={false}
       >
-        <View style={styles.stepHeader}>
+        <View style={styles.topBar}>
           <Pressable onPress={() => setStep("upload")} style={styles.backBtn}>
             <Feather name="arrow-left" size={20} color={Colors.textSecondary} />
           </Pressable>
-          <Text style={styles.stepTitle}>AI Found This</Text>
-          <View style={{ width: 56 }} />
+          <View style={{ width: 48 }} />
         </View>
-        <View style={styles.successBanner}>
-          <Feather name="check-circle" size={18} color={Colors.green} />
-          <Text style={styles.successText}>Chart analyzed successfully!</Text>
+
+        <View style={styles.successBadge}>
+          <Feather name="check-circle" size={16} color={Colors.green} />
+          <Text style={styles.successBadgeText}>AI analysis complete</Text>
         </View>
+
+        <Text style={styles.resultHeadline}>
+          You just created your first{"\n"}AI-powered journal entry.
+        </Text>
+
         {imageUri && (
           <Image
             source={{ uri: imageUri }}
-            style={styles.previewImage}
+            style={styles.resultImage}
             resizeMode="cover"
           />
         )}
-        <View style={styles.resultsCard}>
-          <Text style={styles.resultsTitle}>Extracted Data</Text>
-          <DataRow label="Asset" value={analysis?.asset ?? "—"} isAI />
-          <DataRow label="Timeframe" value={analysis?.timeframe ?? "—"} isAI />
-          <DataRow
-            label="Direction"
-            value={dir.toUpperCase()}
-            isAI
-          />
+
+        <View style={styles.resultCard}>
+          <View style={styles.resultCardHeader}>
+            <View style={styles.aiChipLarge}>
+              <Feather name="cpu" size={11} color={Colors.teal} />
+              <Text style={styles.aiChipLargeText}>AI Extracted</Text>
+            </View>
+          </View>
+
+          <DataRow label="Asset" value={analysis.asset ?? "—"} />
+          <DataRow label="Direction" value={dir.toUpperCase()} />
+          <DataRow label="Timeframe" value={analysis.timeframe ?? "—"} />
+          {analysis.session ? (
+            <DataRow label="Session" value={analysis.session} />
+          ) : null}
           <DataRow
             label="Entry"
-            value={analysis?.entry != null ? String(analysis.entry) : "—"}
-            isAI
+            value={analysis.entry != null ? String(analysis.entry) : "—"}
           />
           <DataRow
             label="Stop Loss"
-            value={analysis?.stopLoss != null ? String(analysis.stopLoss) : "—"}
-            isAI
+            value={analysis.stopLoss != null ? String(analysis.stopLoss) : "—"}
           />
           <DataRow
             label="Take Profit"
-            value={analysis?.takeProfit != null ? String(analysis.takeProfit) : "—"}
-            isAI
+            value={
+              analysis.takeProfit != null ? String(analysis.takeProfit) : "—"
+            }
           />
-          {analysis?.htfTrend ? (
-            <DataRow label="HTF Trend" value={analysis.htfTrend} isAI />
+          {analysis.htfTrend ? (
+            <DataRow label="HTF Trend" value={analysis.htfTrend} />
           ) : null}
         </View>
-        {analysis?.narrative ? (
+
+        {analysis.narrative ? (
           <View style={styles.narrativeCard}>
             <View style={styles.narrativeHeader}>
-              <Feather name="cpu" size={12} color={Colors.teal} />
+              <Feather name="cpu" size={11} color={Colors.teal} />
               <Text style={styles.narrativeTitle}>AI Narrative</Text>
             </View>
             <Text style={styles.narrativeText}>{analysis.narrative}</Text>
           </View>
         ) : null}
-        <View style={styles.completionCard}>
-          <Text style={styles.completionTitle}>Add Trade Outcome</Text>
-          <Text style={styles.completionSub}>Optional — you can update this later</Text>
-          <View style={styles.resultRow}>
-            {(["win", "loss", "breakeven"] as const).map((r) => {
-              const color = r === "win" ? Colors.green : r === "loss" ? Colors.red : Colors.amber;
-              const bg = r === "win" ? Colors.greenMuted : r === "loss" ? Colors.redMuted : Colors.amberMuted;
-              return (
-                <Pressable
-                  key={r}
-                  style={[
-                    styles.resultChip,
-                    result === r && { backgroundColor: bg, borderColor: color },
-                  ]}
-                  onPress={() => { setResult(result === r ? "" : r); Haptics.selectionAsync(); }}
-                >
-                  <Text style={[styles.resultChipText, result === r && { color }]}>
-                    {r.toUpperCase()}
-                  </Text>
-                </Pressable>
-              );
-            })}
-          </View>
-          <View style={styles.pnlRow}>
-            <Text style={styles.pnlLabel}>P&L</Text>
-            <View style={styles.pnlInputWrap}>
-              <Text style={styles.pnlCurrency}>$</Text>
-              <TextInput
-                value={pnl}
-                onChangeText={setPnl}
-                placeholder="0.00"
-                placeholderTextColor={Colors.textMuted}
-                style={styles.pnlInput}
-                keyboardType="decimal-pad"
-                returnKeyType="done"
-              />
-            </View>
-          </View>
-        </View>
+
         <Pressable
-          style={({ pressed }) => [styles.primaryBtn, styles.saveBtn2, { opacity: isPending || pressed ? 0.8 : 1 }]}
+          style={({ pressed }) => [
+            styles.saveBtn,
+            { opacity: isPending || pressed ? 0.85 : 1 },
+          ]}
           onPress={handleSave}
           disabled={isPending}
         >
@@ -462,125 +381,42 @@ export default function OnboardingScreen() {
           ) : (
             <>
               <Feather name="check" size={18} color={Colors.bg} />
-              <Text style={styles.primaryBtnText}>Save & Open Journal</Text>
+              <Text style={styles.saveBtnText}>Save Trade</Text>
             </>
           )}
+        </Pressable>
+
+        <Pressable onPress={handleSkip} style={styles.skipTradeBtn}>
+          <Text style={styles.skipTradeBtnText}>Skip for now</Text>
         </Pressable>
       </ScrollView>
     );
   }
 
-  if (step === "manual") {
+  if (step === "error") {
     return (
-      <ScrollView
-        style={[styles.screen, { paddingTop: topPad }]}
-        contentContainerStyle={{ paddingBottom: insets.bottom + 32 }}
-        showsVerticalScrollIndicator={false}
-        keyboardShouldPersistTaps="handled"
-      >
-        <View style={styles.stepHeader}>
-          <Pressable onPress={() => setStep("upload")} style={styles.backBtn}>
-            <Feather name="arrow-left" size={20} color={Colors.textSecondary} />
-          </Pressable>
-          <Text style={styles.stepTitle}>Quick Log</Text>
-          <Pressable onPress={handleSkip} style={styles.skipBtn2}>
-            <Text style={styles.skipText}>Skip</Text>
-          </Pressable>
+      <View style={[styles.screen, styles.analyzeScreen, { paddingTop: topPad }]}>
+        <View style={styles.errorIconWrap}>
+          <Feather name="alert-circle" size={48} color={Colors.red} />
         </View>
-        <View style={styles.manualCard}>
-          <Text style={styles.manualCardTitle}>Log your first trade</Text>
-          <Text style={styles.manualCardSub}>Start with the basics — add more detail later</Text>
-          <View style={styles.manualField}>
-            <Text style={styles.manualLabel}>Asset / Pair</Text>
-            <TextInput
-              value={asset}
-              onChangeText={setAsset}
-              placeholder="e.g. EUR/USD, BTC/USD..."
-              placeholderTextColor={Colors.textMuted}
-              style={styles.manualInput}
-              autoCapitalize="characters"
-              returnKeyType="done"
-            />
-          </View>
-          <View style={styles.manualField}>
-            <Text style={styles.manualLabel}>Direction</Text>
-            <View style={styles.dirRow}>
-              {(["long", "short"] as const).map((d) => (
-                <Pressable
-                  key={d}
-                  style={[
-                    styles.dirChip,
-                    direction === d && {
-                      backgroundColor: d === "long" ? Colors.greenMuted : Colors.redMuted,
-                      borderColor: d === "long" ? Colors.green : Colors.red,
-                    },
-                  ]}
-                  onPress={() => { setDirection(d); Haptics.selectionAsync(); }}
-                >
-                  <Text style={[
-                    styles.dirChipText,
-                    direction === d && { color: d === "long" ? Colors.green : Colors.red },
-                  ]}>
-                    {d.toUpperCase()}
-                  </Text>
-                </Pressable>
-              ))}
-            </View>
-          </View>
-          <View style={styles.manualField}>
-            <Text style={styles.manualLabel}>Result</Text>
-            <View style={styles.resultRow}>
-              {(["win", "loss", "breakeven"] as const).map((r) => {
-                const color = r === "win" ? Colors.green : r === "loss" ? Colors.red : Colors.amber;
-                const bg = r === "win" ? Colors.greenMuted : r === "loss" ? Colors.redMuted : Colors.amberMuted;
-                return (
-                  <Pressable
-                    key={r}
-                    style={[
-                      styles.resultChip,
-                      result === r && { backgroundColor: bg, borderColor: color },
-                    ]}
-                    onPress={() => { setResult(result === r ? "" : r); Haptics.selectionAsync(); }}
-                  >
-                    <Text style={[styles.resultChipText, result === r && { color }]}>
-                      {r.toUpperCase()}
-                    </Text>
-                  </Pressable>
-                );
-              })}
-            </View>
-          </View>
-          <View style={styles.pnlRow}>
-            <Text style={styles.pnlLabel}>P&L</Text>
-            <View style={styles.pnlInputWrap}>
-              <Text style={styles.pnlCurrency}>$</Text>
-              <TextInput
-                value={pnl}
-                onChangeText={setPnl}
-                placeholder="0.00"
-                placeholderTextColor={Colors.textMuted}
-                style={styles.pnlInput}
-                keyboardType="decimal-pad"
-                returnKeyType="done"
-              />
-            </View>
-          </View>
-        </View>
+        <Text style={styles.errorTitle}>Analysis failed</Text>
+        <Text style={styles.errorSub}>
+          We couldn't read the chart. Make sure it's a clear trading chart screenshot.
+        </Text>
         <Pressable
-          style={({ pressed }) => [styles.primaryBtn, styles.saveBtn2, { opacity: isPending || pressed ? 0.8 : 1 }]}
-          onPress={handleSave}
-          disabled={isPending}
+          style={({ pressed }) => [
+            styles.retryBtn,
+            { opacity: pressed ? 0.8 : 1 },
+          ]}
+          onPress={() => setStep("upload")}
         >
-          {isPending ? (
-            <ActivityIndicator color={Colors.bg} size="small" />
-          ) : (
-            <>
-              <Feather name="check" size={18} color={Colors.bg} />
-              <Text style={styles.primaryBtnText}>Save & Open Journal</Text>
-            </>
-          )}
+          <Feather name="refresh-cw" size={16} color={Colors.teal} />
+          <Text style={styles.retryBtnText}>Try another chart</Text>
         </Pressable>
-      </ScrollView>
+        <Pressable onPress={handleSkip} style={styles.skipTradeBtn}>
+          <Text style={styles.skipTradeBtnText}>Skip for now</Text>
+        </Pressable>
+      </View>
     );
   }
 
@@ -592,118 +428,21 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: Colors.bg,
   },
+  topBar: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 16,
+    paddingBottom: 8,
+  },
   skipBtn: {
-    position: "absolute",
-    top: 16,
-    right: 20,
-    zIndex: 10,
     paddingHorizontal: 12,
-    paddingVertical: 6,
+    paddingVertical: 8,
   },
   skipText: {
     fontFamily: "Inter_500Medium",
     fontSize: 14,
     color: Colors.textSecondary,
-  },
-  welcomeContent: {
-    flex: 1,
-    paddingHorizontal: 24,
-    paddingTop: 32,
-    alignItems: "center",
-  },
-  welcomeIconWrap: {
-    width: 88,
-    height: 88,
-    borderRadius: 24,
-    backgroundColor: Colors.tealDim,
-    borderWidth: 1,
-    borderColor: Colors.teal,
-    alignItems: "center",
-    justifyContent: "center",
-    marginBottom: 24,
-  },
-  welcomeIcon: {
-    fontSize: 44,
-  },
-  welcomeTitle: {
-    fontFamily: "Inter_700Bold",
-    fontSize: 28,
-    color: Colors.text,
-    textAlign: "center",
-    marginBottom: 12,
-  },
-  welcomeSub: {
-    fontFamily: "Inter_400Regular",
-    fontSize: 16,
-    color: Colors.textSecondary,
-    textAlign: "center",
-    lineHeight: 24,
-    marginBottom: 32,
-    paddingHorizontal: 12,
-  },
-  featureList: {
-    width: "100%",
-    gap: 14,
-    marginBottom: 40,
-  },
-  featureRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 14,
-    backgroundColor: Colors.surface,
-    borderRadius: 14,
-    padding: 14,
-    borderWidth: 1,
-    borderColor: Colors.border,
-  },
-  featureIconWrap: {
-    width: 36,
-    height: 36,
-    borderRadius: 10,
-    backgroundColor: Colors.tealDim,
-    borderWidth: 1,
-    borderColor: Colors.teal,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  featureText: {
-    fontFamily: "Inter_500Medium",
-    fontSize: 14,
-    color: Colors.text,
-    flex: 1,
-    lineHeight: 20,
-  },
-  primaryBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 10,
-    backgroundColor: Colors.teal,
-    borderRadius: 16,
-    paddingVertical: 16,
-    paddingHorizontal: 24,
-    width: "100%",
-  },
-  primaryBtnText: {
-    fontFamily: "Inter_700Bold",
-    fontSize: 16,
-    color: Colors.bg,
-  },
-  ghostBtn: {
-    paddingVertical: 14,
-    alignItems: "center",
-  },
-  ghostBtnText: {
-    fontFamily: "Inter_400Regular",
-    fontSize: 14,
-    color: Colors.textMuted,
-  },
-  stepHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 16,
-    paddingBottom: 16,
   },
   backBtn: {
     width: 40,
@@ -711,274 +450,210 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  stepTitle: {
+  uploadBody: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 32,
+    paddingBottom: 48,
+    gap: 0,
+  },
+  uploadIconWrap: {
+    marginBottom: 20,
+  },
+  uploadEmoji: {
+    fontSize: 52,
+  },
+  uploadTitle: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 26,
+    color: Colors.text,
+    textAlign: "center",
+    marginBottom: 10,
+  },
+  uploadHint: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 15,
+    color: Colors.textSecondary,
+    textAlign: "center",
+    marginBottom: 44,
+  },
+  bigUploadBtn: {
+    alignItems: "center",
+    gap: 12,
+    marginBottom: 28,
+  },
+  bigUploadCircle: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    backgroundColor: Colors.teal,
+    alignItems: "center",
+    justifyContent: "center",
+    shadowColor: Colors.teal,
+    shadowOpacity: 0.4,
+    shadowRadius: 20,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 8,
+  },
+  bigUploadLabel: {
     fontFamily: "Inter_700Bold",
     fontSize: 18,
     color: Colors.text,
   },
-  stepTitle2: {
-    fontFamily: "Inter_700Bold",
-    fontSize: 22,
-    color: Colors.text,
-    textAlign: "center",
-    marginBottom: 20,
-    paddingHorizontal: 24,
-  },
-  skipBtn2: {
-    paddingHorizontal: 8,
-    paddingVertical: 8,
-  },
-  uploadContent: {
-    flex: 1,
-    paddingHorizontal: 24,
-    paddingTop: 16,
-    alignItems: "center",
-  },
-  uploadIllustration: {
-    alignItems: "center",
-    marginBottom: 32,
-  },
-  uploadTitle: {
-    fontFamily: "Inter_700Bold",
-    fontSize: 22,
-    color: Colors.text,
-    marginTop: 16,
-    marginBottom: 10,
-    textAlign: "center",
-  },
-  uploadDesc: {
+  bigUploadSub: {
     fontFamily: "Inter_400Regular",
-    fontSize: 14,
-    color: Colors.textSecondary,
-    textAlign: "center",
-    lineHeight: 22,
-    paddingHorizontal: 12,
+    fontSize: 13,
+    color: Colors.textMuted,
   },
-  uploadBtns: {
+  cameraAltBtn: {
     flexDirection: "row",
-    gap: 16,
-    width: "100%",
-    marginBottom: 24,
-  },
-  uploadBtn: {
-    flex: 1,
-    backgroundColor: Colors.surface,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: Colors.teal,
     alignItems: "center",
-    paddingVertical: 24,
-    gap: 8,
+    gap: 6,
+    paddingVertical: 10,
   },
-  uploadBtnLabel: {
-    fontFamily: "Inter_600SemiBold",
+  cameraAltText: {
+    fontFamily: "Inter_500Medium",
     fontSize: 14,
     color: Colors.teal,
   },
-  uploadBtnSub: {
-    fontFamily: "Inter_400Regular",
-    fontSize: 11,
-    color: Colors.textMuted,
-  },
-  manualLink: {
-    paddingVertical: 12,
-  },
-  manualLinkText: {
-    fontFamily: "Inter_400Regular",
-    fontSize: 13,
-    color: Colors.textMuted,
-  },
-  scanWrap: {
+  analyzeScreen: {
     alignItems: "center",
-    paddingHorizontal: 32,
-    marginTop: 16,
-    gap: 16,
-  },
-  scanBox: {
-    width: SCREEN_W - 64,
-    height: 100,
-    borderWidth: 1.5,
-    borderColor: Colors.teal,
-    borderRadius: 12,
-    overflow: "hidden",
-    position: "relative",
     justifyContent: "center",
+    gap: 0,
   },
-  scanLine: {
-    position: "absolute",
-    left: 0,
-    right: 0,
-    height: 2,
-    backgroundColor: Colors.teal,
-    shadowColor: Colors.teal,
-    shadowOpacity: 0.9,
-    shadowRadius: 8,
-  },
-  scanCornerTL: {
-    position: "absolute",
-    top: -1,
-    left: -1,
-    width: 16,
-    height: 16,
-    borderTopWidth: 3,
-    borderLeftWidth: 3,
-    borderColor: Colors.teal,
-    borderRadius: 2,
-  },
-  scanCornerTR: {
-    position: "absolute",
-    top: -1,
-    right: -1,
-    width: 16,
-    height: 16,
-    borderTopWidth: 3,
-    borderRightWidth: 3,
-    borderColor: Colors.teal,
-    borderRadius: 2,
-  },
-  scanCornerBL: {
-    position: "absolute",
-    bottom: -1,
-    left: -1,
-    width: 16,
-    height: 16,
-    borderBottomWidth: 3,
-    borderLeftWidth: 3,
-    borderColor: Colors.teal,
-    borderRadius: 2,
-  },
-  scanCornerBR: {
-    position: "absolute",
-    bottom: -1,
-    right: -1,
-    width: 16,
-    height: 16,
-    borderBottomWidth: 3,
-    borderRightWidth: 3,
-    borderColor: Colors.teal,
-    borderRadius: 2,
-  },
-  scanLabel: {
-    fontFamily: "Inter_600SemiBold",
-    fontSize: 16,
-    color: Colors.teal,
-    textAlign: "center",
-  },
-  scanSub: {
-    fontFamily: "Inter_400Regular",
-    fontSize: 13,
-    color: Colors.textSecondary,
-    textAlign: "center",
-  },
-  analyzeImage: {
-    width: SCREEN_W - 48,
-    height: 180,
+  analyzeThumb: {
+    width: SCREEN_W - 64,
+    height: 140,
     borderRadius: 16,
-    alignSelf: "center",
-    marginBottom: 16,
     borderWidth: 1,
     borderColor: Colors.border,
+    marginBottom: 40,
+  },
+  pulseWrap: {
+    width: 120,
+    height: 120,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 28,
+  },
+  pulseRingOuter: {
+    position: "absolute",
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    borderWidth: 3,
+    borderColor: Colors.teal,
+  },
+  pulseRingInner: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: Colors.tealDim,
+    borderWidth: 2,
+    borderColor: Colors.teal,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  analyzeTitle: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 22,
+    color: Colors.text,
+    textAlign: "center",
+    marginBottom: 10,
   },
   analyzeSub: {
     fontFamily: "Inter_400Regular",
-    fontSize: 13,
-    color: Colors.textMuted,
+    fontSize: 14,
+    color: Colors.textSecondary,
     textAlign: "center",
-    paddingHorizontal: 32,
-    marginTop: 16,
-    lineHeight: 20,
   },
-  successBanner: {
+  resultScroll: {
+    paddingHorizontal: 16,
+    gap: 12,
+  },
+  successBadge: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 8,
+    gap: 6,
+    alignSelf: "flex-start",
     backgroundColor: Colors.greenMuted,
-    borderRadius: 12,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    marginHorizontal: 16,
-    marginBottom: 12,
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    marginBottom: 4,
   },
-  successText: {
+  successBadgeText: {
     fontFamily: "Inter_600SemiBold",
-    fontSize: 13,
+    fontSize: 12,
     color: Colors.green,
   },
-  previewImage: {
-    width: SCREEN_W - 32,
+  resultHeadline: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 22,
+    color: Colors.text,
+    lineHeight: 30,
+    marginBottom: 4,
+  },
+  resultImage: {
+    width: "100%",
     height: 160,
     borderRadius: 16,
-    alignSelf: "center",
-    marginBottom: 12,
     borderWidth: 1,
     borderColor: Colors.border,
   },
-  resultsCard: {
+  resultCard: {
     backgroundColor: Colors.surface,
     borderRadius: 16,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    marginHorizontal: 16,
-    marginBottom: 12,
-    padding: 16,
-    gap: 4,
+    borderWidth: 1.5,
+    borderColor: Colors.teal,
+    overflow: "hidden",
   },
-  resultsTitle: {
-    fontFamily: "Inter_600SemiBold",
-    fontSize: 13,
-    color: Colors.textSecondary,
+  resultCardHeader: {
+    backgroundColor: Colors.tealDim,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.teal,
+  },
+  aiChipLarge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    alignSelf: "flex-start",
+  },
+  aiChipLargeText: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 11,
+    color: Colors.teal,
     letterSpacing: 0.5,
     textTransform: "uppercase",
-    marginBottom: 8,
   },
   dataRow: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    paddingVertical: 7,
-    borderBottomWidth: 0,
+    paddingHorizontal: 16,
+    paddingVertical: 11,
+    borderBottomWidth: 1,
     borderBottomColor: Colors.border,
   },
   dataLabel: {
     fontFamily: "Inter_400Regular",
-    fontSize: 13,
+    fontSize: 14,
     color: Colors.textSecondary,
-  },
-  dataRight: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
   },
   dataValue: {
     fontFamily: "Inter_600SemiBold",
-    fontSize: 13,
+    fontSize: 14,
     color: Colors.text,
     fontVariant: ["tabular-nums"],
-  },
-  aiChip: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 3,
-    backgroundColor: Colors.tealMuted,
-    borderRadius: 5,
-    paddingHorizontal: 5,
-    paddingVertical: 2,
-    borderWidth: 1,
-    borderColor: Colors.teal,
-  },
-  aiChipText: {
-    fontFamily: "Inter_700Bold",
-    fontSize: 8,
-    color: Colors.teal,
-    letterSpacing: 0.5,
   },
   narrativeCard: {
     backgroundColor: Colors.tealDim,
     borderRadius: 16,
     borderWidth: 1,
     borderColor: Colors.teal,
-    marginHorizontal: 16,
-    marginBottom: 12,
     padding: 14,
     gap: 8,
   },
@@ -989,7 +664,7 @@ const styles = StyleSheet.create({
   },
   narrativeTitle: {
     fontFamily: "Inter_600SemiBold",
-    fontSize: 12,
+    fontSize: 11,
     color: Colors.teal,
     letterSpacing: 0.5,
     textTransform: "uppercase",
@@ -1000,141 +675,64 @@ const styles = StyleSheet.create({
     color: Colors.text,
     lineHeight: 20,
   },
-  completionCard: {
-    backgroundColor: Colors.surface,
+  saveBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 10,
+    backgroundColor: Colors.teal,
     borderRadius: 16,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    marginHorizontal: 16,
-    marginBottom: 16,
-    padding: 16,
-    gap: 12,
+    paddingVertical: 16,
+    marginTop: 4,
   },
-  completionTitle: {
-    fontFamily: "Inter_600SemiBold",
-    fontSize: 15,
-    color: Colors.text,
+  saveBtnText: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 16,
+    color: Colors.bg,
   },
-  completionSub: {
+  skipTradeBtn: {
+    alignItems: "center",
+    paddingVertical: 12,
+  },
+  skipTradeBtnText: {
     fontFamily: "Inter_400Regular",
-    fontSize: 12,
+    fontSize: 14,
     color: Colors.textMuted,
-    marginTop: -8,
   },
-  resultRow: {
-    flexDirection: "row",
-    gap: 8,
+  errorIconWrap: {
+    marginBottom: 20,
   },
-  resultChip: {
-    flex: 1,
-    alignItems: "center",
-    paddingVertical: 10,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    backgroundColor: Colors.surface2,
+  errorTitle: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 22,
+    color: Colors.text,
+    marginBottom: 10,
+    textAlign: "center",
   },
-  resultChipText: {
-    fontFamily: "Inter_600SemiBold",
-    fontSize: 12,
-    color: Colors.textSecondary,
-    letterSpacing: 0.5,
-  },
-  pnlRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-  },
-  pnlLabel: {
-    fontFamily: "Inter_500Medium",
+  errorSub: {
+    fontFamily: "Inter_400Regular",
     fontSize: 14,
     color: Colors.textSecondary,
+    textAlign: "center",
+    paddingHorizontal: 32,
+    lineHeight: 22,
+    marginBottom: 32,
   },
-  pnlInputWrap: {
+  retryBtn: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: Colors.surface2,
-    borderRadius: 10,
+    gap: 8,
+    backgroundColor: Colors.surface,
+    borderRadius: 14,
     borderWidth: 1,
-    borderColor: Colors.border,
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-    minWidth: 120,
-  },
-  pnlCurrency: {
-    fontFamily: "Inter_500Medium",
-    fontSize: 15,
-    color: Colors.teal,
-    marginRight: 4,
-  },
-  pnlInput: {
-    fontFamily: "Inter_600SemiBold",
-    fontSize: 15,
-    color: Colors.text,
-    minWidth: 80,
-    fontVariant: ["tabular-nums"],
-  },
-  saveBtn2: {
-    marginHorizontal: 16,
+    borderColor: Colors.teal,
+    paddingHorizontal: 24,
+    paddingVertical: 14,
     marginBottom: 8,
   },
-  manualCard: {
-    backgroundColor: Colors.surface,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    marginHorizontal: 16,
-    marginBottom: 16,
-    padding: 16,
-    gap: 16,
-  },
-  manualCardTitle: {
+  retryBtnText: {
     fontFamily: "Inter_600SemiBold",
-    fontSize: 16,
-    color: Colors.text,
-  },
-  manualCardSub: {
-    fontFamily: "Inter_400Regular",
-    fontSize: 12,
-    color: Colors.textMuted,
-    marginTop: -10,
-  },
-  manualField: {
-    gap: 8,
-  },
-  manualLabel: {
-    fontFamily: "Inter_500Medium",
-    fontSize: 13,
-    color: Colors.textSecondary,
-  },
-  manualInput: {
-    backgroundColor: Colors.surface2,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    fontFamily: "Inter_500Medium",
     fontSize: 15,
-    color: Colors.text,
-  },
-  dirRow: {
-    flexDirection: "row",
-    gap: 10,
-  },
-  dirChip: {
-    flex: 1,
-    alignItems: "center",
-    paddingVertical: 12,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    backgroundColor: Colors.surface2,
-  },
-  dirChipText: {
-    fontFamily: "Inter_600SemiBold",
-    fontSize: 13,
-    color: Colors.textSecondary,
-    letterSpacing: 0.5,
+    color: Colors.teal,
   },
 });

@@ -6,16 +6,17 @@ import {
   useFonts,
 } from "@expo-google-fonts/inter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { setBaseUrl } from "@workspace/api-client-react";
+import { listTrades, setBaseUrl } from "@workspace/api-client-react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { router, Stack, useSegments } from "expo-router";
+import { router, Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef } from "react";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { KeyboardProvider } from "react-native-keyboard-controller";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
 import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { ONBOARDING_KEY } from "@/constants/storage";
 
 setBaseUrl(`https://${process.env.EXPO_PUBLIC_DOMAIN}`);
 
@@ -23,10 +24,7 @@ SplashScreen.preventAutoHideAsync();
 
 const queryClient = new QueryClient();
 
-const ONBOARDING_KEY = "tradelog_onboarding_done";
-
 function OnboardingGuard() {
-  const segments = useSegments();
   const checked = useRef(false);
 
   useEffect(() => {
@@ -34,9 +32,17 @@ function OnboardingGuard() {
     checked.current = true;
 
     async function check() {
-      const done = await AsyncStorage.getItem(ONBOARDING_KEY);
-      if (!done) {
-        router.replace("/onboarding");
+      try {
+        const done = await AsyncStorage.getItem(ONBOARDING_KEY);
+        if (done) return;
+
+        const data = await listTrades();
+        const tradeCount = data?.trades?.length ?? 0;
+        if (tradeCount === 0) {
+          router.replace("/onboarding");
+        }
+      } catch {
+        // If the fetch fails, don't block the user — just show the journal
       }
     }
 
