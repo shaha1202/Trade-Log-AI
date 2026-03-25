@@ -964,7 +964,6 @@ const styles = StyleSheet.create({
   streakRow: {
     flexDirection: "row",
     backgroundColor: Colors.surface,
-    marginHorizontal: 16,
     marginBottom: 10,
     borderRadius: 16,
     padding: 12,
