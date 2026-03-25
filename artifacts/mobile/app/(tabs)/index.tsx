@@ -937,7 +937,6 @@ const styles = StyleSheet.create({
     alignSelf: "center",
   },
   sparkCard: {
-    marginHorizontal: 16,
     marginBottom: 10,
     backgroundColor: Colors.surface,
     borderRadius: 16,
