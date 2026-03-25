@@ -105,13 +105,15 @@ function TradeCard({ trade }: { trade: Trade }) {
 }
 
 function AIInsightCard({ tradeCount, refreshing }: { tradeCount: number; refreshing: boolean }) {
-  const { data, isLoading, refetch } = useGetAiInsight();
+  const { data, isLoading, refetch } = useGetAiInsight({
+    query: { enabled: tradeCount >= 3, staleTime: 5 * 60 * 1000 },
+  });
 
   React.useEffect(() => {
-    if (refreshing) {
+    if (refreshing && tradeCount >= 3) {
       refetch();
     }
-  }, [refreshing, refetch]);
+  }, [refreshing, tradeCount, refetch]);
 
   if (tradeCount < 3) return null;
 
@@ -272,7 +274,7 @@ function StreakRow({ trades }: { trades: Trade[] }) {
 
   const last10 = trades.slice(0, 10);
   const disciplineCount = last10.filter((t) => (t.planAdherence ?? 0) >= 3).length;
-  const maxScore = Math.min(last10.length, 10);
+  const maxScore = 10;
 
   const streakColor = streak >= 3 ? Colors.green : streak >= 1 ? Colors.amber : Colors.textMuted;
   const streakEmoji = streak >= 3 ? "🔥" : streak >= 1 ? "✅" : "📉";
