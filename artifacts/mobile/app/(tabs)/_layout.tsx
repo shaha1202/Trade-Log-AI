@@ -24,6 +24,10 @@ function NativeTabLayout() {
         <Icon sf={{ default: "chart.bar", selected: "chart.bar.fill" }} />
         <Label>Statistics</Label>
       </NativeTabs.Trigger>
+      <NativeTabs.Trigger name="settings">
+        <Icon sf={{ default: "gear", selected: "gear" }} />
+        <Label>Settings</Label>
+      </NativeTabs.Trigger>
     </NativeTabs>
   );
 }
@@ -97,6 +101,18 @@ function ClassicTabLayout() {
               <SymbolView name="chart.bar" tintColor={color} size={size} />
             ) : (
               <Feather name="bar-chart-2" size={size} color={color} />
+            ),
+        }}
+      />
+      <Tabs.Screen
+        name="settings"
+        options={{
+          title: "Settings",
+          tabBarIcon: ({ color, size }) =>
+            isIOS ? (
+              <SymbolView name="gear" tintColor={color} size={size} />
+            ) : (
+              <Feather name="settings" size={size} color={color} />
             ),
         }}
       />

@@ -26,20 +26,10 @@ import Animated, {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import Colors from "@/constants/colors";
+import { useSettings } from "@/hooks/useSettings";
 
 const TIMEFRAMES = ["M1", "M5", "M15", "M30", "H1", "H4", "D1", "W1"];
 const SESSIONS = ["Asian", "London", "New York", "London+NY"];
-const CONFLUENCES = [
-  "FVG",
-  "Order Block",
-  "Liquidity Sweep",
-  "Break of Structure",
-  "EMA 200",
-  "Support/Resistance",
-  "Session Open",
-  "HTF Trend",
-  "Fibonacci",
-];
 const MOODS = [
   "Confident",
   "Patient",
@@ -313,6 +303,7 @@ export default function AddTradeScreen() {
   const [scanning, setScanning] = useState(false);
   const [imageUri, setImageUri] = useState<string | null>(null);
   const { mutateAsync: createTrade, isPending } = useCreateTrade();
+  const { confluenceTags: CONFLUENCES } = useSettings();
 
   const update = (key: keyof FormState, value: unknown) => {
     setForm((prev) => ({ ...prev, [key]: value }));
