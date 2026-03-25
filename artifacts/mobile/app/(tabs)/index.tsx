@@ -438,15 +438,17 @@ function CalendarHeatmap({ trades }: { trades: Trade[] }) {
   const monthName = firstDay.toLocaleDateString([], { month: "long", year: "numeric" });
   const weekdays = ["M", "T", "W", "T", "F", "S", "S"];
 
-  const cells: { day: number | null; key: string | null }[] = [];
-  for (let i = 0; i < startDow; i++) cells.push({ day: null, key: null });
+  const flatCells: { day: number | null; key: string | null }[] = [];
+  for (let i = 0; i < startDow; i++) flatCells.push({ day: null, key: null });
   for (let d = 1; d <= daysInMonth; d++) {
     const date = new Date(year, month, d);
     const key = date.toISOString().substring(0, 10);
-    cells.push({ day: d, key });
+    flatCells.push({ day: d, key });
   }
+  while (flatCells.length % 7 !== 0) flatCells.push({ day: null, key: null });
 
-  const cellSize = Math.floor((SCREEN_W - 32 - 6 * 6) / 7);
+  const rows: { day: number | null; key: string | null }[][] = [];
+  for (let i = 0; i < flatCells.length; i += 7) rows.push(flatCells.slice(i, i + 7));
 
   function getCellStyle(key: string | null, day: number | null) {
     if (!key || !day) return { backgroundColor: "transparent" };
@@ -488,26 +490,32 @@ function CalendarHeatmap({ trades }: { trades: Trade[] }) {
         </View>
       </View>
       <View style={styles.calGrid}>
-        {weekdays.map((wd, i) => (
-          <View key={i} style={[styles.calCell, { width: cellSize, height: 18 }]}>
-            <Text style={styles.calWeekday}>{wd}</Text>
-          </View>
-        ))}
-        {cells.map((cell, i) => (
-          <View
-            key={i}
-            style={[
-              styles.calCell,
-              { width: cellSize, height: cellSize },
-              getCellStyle(cell.key, cell.day),
-              { borderRadius: 6 },
-            ]}
-          >
-            {cell.day != null && (
-              <Text style={[styles.calDay, { color: getCellTextColor(cell.key, cell.day) }]}>
-                {cell.day}
-              </Text>
-            )}
+        <View style={styles.calRow}>
+          {weekdays.map((wd, i) => (
+            <View key={i} style={styles.calCell}>
+              <Text style={styles.calWeekday}>{wd}</Text>
+            </View>
+          ))}
+        </View>
+        {rows.map((row, ri) => (
+          <View key={ri} style={styles.calRow}>
+            {row.map((cell, ci) => (
+              <View
+                key={ci}
+                style={[
+                  styles.calCell,
+                  styles.calDateCell,
+                  getCellStyle(cell.key, cell.day),
+                  { borderRadius: 6 },
+                ]}
+              >
+                {cell.day != null && (
+                  <Text style={[styles.calDay, { color: getCellTextColor(cell.key, cell.day) }]}>
+                    {cell.day}
+                  </Text>
+                )}
+              </View>
+            ))}
           </View>
         ))}
       </View>
@@ -1067,13 +1075,21 @@ const styles = StyleSheet.create({
     color: Colors.textMuted,
   },
   calGrid: {
+    gap: 6,
+  },
+  calRow: {
     flexDirection: "row",
-    flexWrap: "wrap",
     gap: 6,
   },
   calCell: {
+    flex: 1,
     alignItems: "center",
     justifyContent: "center",
+    height: 18,
+  },
+  calDateCell: {
+    aspectRatio: 1,
+    height: undefined,
   },
   calWeekday: {
     fontFamily: "Inter_500Medium",
