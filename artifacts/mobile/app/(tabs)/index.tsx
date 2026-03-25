@@ -210,11 +210,10 @@ function StatsBar({ trades }: { trades: Trade[] }) {
   const rrContext = getContext(todayAvgRr, histAvgRr, true);
 
   const todayCount = todayTrades.length;
-  const pastDayCount = pastDaysMap.size;
-  const histAvgDayCount = pastDayCount > 0 ? pastDayCount : null;
-  const countContext = histAvgDayCount != null
-    ? getContext(todayCount, todayTrades.length > 0 ? todayCount : null, true)
-    : { label: "—", color: Colors.textMuted };
+  const histAvgTradesPerDay = pastDaysMap.size > 0
+    ? pastTrades.length / pastDaysMap.size
+    : null;
+  const countContext = getContext(todayCount > 0 ? todayCount : null, histAvgTradesPerDay, true);
 
   return (
     <View style={styles.statsBar}>
