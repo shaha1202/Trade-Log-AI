@@ -686,7 +686,7 @@ export default function JournalScreen() {
   }, [refetch]);
 
   const topPad = Platform.OS === "web" ? 67 : insets.top;
-  const bottomPad = Platform.OS === "web" ? 34 : insets.bottom + 80;
+  const bottomPad = Platform.OS === "web" ? 96 : insets.bottom + 80;
 
   return (
     <View style={[styles.container, { paddingTop: topPad }]}>
