@@ -1,5 +1,6 @@
 import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
+import { useRouter } from "expo-router";
 import React, { useState } from "react";
 import {
   Alert,
@@ -38,6 +39,7 @@ function SectionCard({ children }: { children: React.ReactNode }) {
 }
 
 export default function SettingsScreen() {
+  const router = useRouter();
   const insets = useSafeAreaInsets();
   const {
     profileName,
@@ -192,6 +194,7 @@ export default function SettingsScreen() {
               </View>
               <Pressable
                 style={({ pressed }) => [styles.upgradeBtn, { opacity: pressed ? 0.8 : 1 }]}
+                onPress={() => router.push("/paywall")}
               >
                 <Feather name="zap" size={14} color={Colors.bg} />
                 <Text style={styles.upgradeBtnText}>Upgrade</Text>
