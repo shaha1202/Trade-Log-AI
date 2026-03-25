@@ -1,0 +1,25 @@
+const Colors = {
+  bg: "#0e0e10",
+  surface: "#1a1a1e",
+  surface2: "#242428",
+  surface3: "#2e2e34",
+  border: "#2e2e34",
+  text: "#ffffff",
+  textSecondary: "#8e8e9a",
+  textMuted: "#5a5a6e",
+  teal: "#00c2b3",
+  tealMuted: "rgba(0,194,179,0.15)",
+  tealDim: "rgba(0,194,179,0.08)",
+  green: "#22c55e",
+  greenMuted: "rgba(34,197,94,0.15)",
+  red: "#ef4444",
+  redMuted: "rgba(239,68,68,0.15)",
+  amber: "#f59e0b",
+  amberMuted: "rgba(245,158,11,0.15)",
+  purple: "#a855f7",
+  purpleMuted: "rgba(168,85,247,0.15)",
+  white: "#ffffff",
+  tabBar: "#111114",
+};
+
+export default Colors;

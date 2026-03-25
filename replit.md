@@ -91,6 +91,24 @@ Generated Zod schemas from the OpenAPI spec (e.g. `HealthCheckResponse`). Used b
 
 Generated React Query hooks and fetch client from the OpenAPI spec (e.g. `useHealthCheck`, `healthCheck`).
 
+### `artifacts/mobile` (`@workspace/mobile`)
+
+Expo React Native mobile app — **TradeLog** AI-powered trading journal.
+
+- Framework: Expo ~54 + Expo Router ~6, React Native 0.81
+- Navigation: 3-tab layout (Journal, Add Trade, Statistics) with `ClassicTabs` + `NativeTabs` iOS 26 liquid glass fallback
+- Dark theme: `constants/colors.ts` — bg #0e0e10, teal #00c2b3 (AI), green/red for direction/result, purple for tags, amber for stars
+- Font: `@expo-google-fonts/inter` — Inter_400Regular/500Medium/600SemiBold/700Bold
+- Screens:
+  - `(tabs)/index.tsx` — Journal with trade list, summary stats header
+  - `(tabs)/add.tsx` — Add Trade: AI camera scan + 5-form sections (Setup/Risk/Analysis/Checklist/Psychology)
+  - `(tabs)/stats.tsx` — Statistics: monthly P&L bar chart, win rate donut, key metrics
+  - `trade/[id].tsx` — Trade detail: all fields, checklist status, AI narrative, psychology notes
+- Uses `@workspace/api-client-react` hooks (generated from OpenAPI spec)
+- API URL set via `EXPO_PUBLIC_DOMAIN` env var in `_layout.tsx`
+- AI scan: POST /api/trades/analyze with base64 chart image → Claude Vision fills trade fields
+- `pnpm --filter @workspace/mobile run dev` — start Expo dev server
+
 ### `scripts` (`@workspace/scripts`)
 
 Utility scripts package. Each script is a `.ts` file in `src/` with a corresponding npm script in `package.json`. Run scripts via `pnpm --filter @workspace/scripts run <script>`. Scripts can import any workspace package (e.g., `@workspace/db`) by adding it as a dependency in `scripts/package.json`.
