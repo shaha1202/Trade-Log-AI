@@ -104,10 +104,16 @@ function TradeCard({ trade }: { trade: Trade }) {
   );
 }
 
-function AIInsightCard({ tradeCount, onRefresh }: { tradeCount: number; onRefresh: () => void }) {
-  const { data, isLoading } = useGetAiInsight({ query: { staleTime: 5 * 60 * 1000 } });
+function AIInsightCard({ tradeCount, refreshing }: { tradeCount: number; refreshing: boolean }) {
+  const { data, isLoading, refetch } = useGetAiInsight();
 
-  if (tradeCount === 0) return null;
+  React.useEffect(() => {
+    if (refreshing) {
+      refetch();
+    }
+  }, [refreshing, refetch]);
+
+  if (tradeCount < 3) return null;
 
   return (
     <View style={styles.insightCard}>
@@ -132,7 +138,7 @@ function AIInsightCard({ tradeCount, onRefresh }: { tradeCount: number; onRefres
 type ContextLabel = { label: string; color: string } | null;
 
 function getContext(todayVal: number | null, histAvg: number | null, higherIsBetter: boolean): ContextLabel {
-  if (todayVal == null || histAvg == null || histAvg === 0) return null;
+  if (todayVal == null || histAvg == null || histAvg === 0) return { label: "—", color: Colors.textMuted };
   const ratio = todayVal / histAvg;
   if (higherIsBetter) {
     if (ratio >= 1.1) return { label: "Above avg", color: Colors.green };
@@ -149,19 +155,21 @@ function StatItem({
   value,
   label,
   context,
+  valueColor,
 }: {
   value: string;
   label: string;
   context: ContextLabel;
+  valueColor?: string;
 }) {
   return (
     <View style={styles.statItem}>
-      <Text style={styles.statValue}>{value}</Text>
+      <Text style={[styles.statValue, valueColor ? { color: valueColor } : null]}>{value}</Text>
       <Text style={styles.statLabel}>{label}</Text>
       {context ? (
         <Text style={[styles.statContext, { color: context.color }]}>{context.label}</Text>
       ) : (
-        <View style={{ height: 14 }} />
+        <Text style={[styles.statContext, { color: Colors.textMuted }]}>—</Text>
       )}
     </View>
   );
@@ -201,30 +209,40 @@ function StatsBar({ trades }: { trades: Trade[] }) {
   const pnlContext = getContext(todayPnl, histAvgDailyPnl, true);
   const rrContext = getContext(todayAvgRr, histAvgRr, true);
 
+  const todayCount = todayTrades.length;
+  const pastDayCount = pastDaysMap.size;
+  const histAvgDayCount = pastDayCount > 0 ? pastDayCount : null;
+  const countContext = histAvgDayCount != null
+    ? getContext(todayCount, todayTrades.length > 0 ? todayCount : null, true)
+    : { label: "—", color: Colors.textMuted };
+
   return (
     <View style={styles.statsBar}>
       <StatItem
-        value={String(todayTrades.length)}
+        value={String(todayCount)}
         label="Today"
-        context={null}
+        context={countContext}
       />
       <View style={styles.statDivider} />
       <StatItem
         value={todayWinRate != null ? `${todayWinRate.toFixed(0)}%` : "—"}
         label="Win Rate"
         context={winRateContext}
+        valueColor={todayWinRate != null ? (todayWinRate >= 50 ? Colors.green : Colors.red) : undefined}
       />
       <View style={styles.statDivider} />
       <StatItem
         value={todayPnl != null ? `${todayPnl >= 0 ? "+" : ""}${todayPnl.toFixed(2)}` : "—"}
         label="Daily P&L"
         context={pnlContext}
+        valueColor={todayPnl != null ? (todayPnl > 0 ? Colors.green : todayPnl < 0 ? Colors.red : Colors.textSecondary) : undefined}
       />
       <View style={styles.statDivider} />
       <StatItem
         value={todayAvgRr != null ? `${todayAvgRr.toFixed(2)}R` : "—"}
         label="Avg R:R"
         context={rrContext}
+        valueColor={Colors.teal}
       />
     </View>
   );
@@ -233,9 +251,6 @@ function StatsBar({ trades }: { trades: Trade[] }) {
 function StreakRow({ trades }: { trades: Trade[] }) {
   if (trades.length === 0) return null;
 
-  const todayStart = new Date();
-  todayStart.setHours(0, 0, 0, 0);
-
   const dayMap = new Map<string, number>();
   for (const t of trades) {
     const key = t.createdAt.substring(0, 10);
@@ -243,38 +258,34 @@ function StreakRow({ trades }: { trades: Trade[] }) {
   }
 
   let streak = 0;
-  const cursor = new Date(todayStart);
-  cursor.setDate(cursor.getDate() - 1);
+  const cursor = new Date();
+  cursor.setHours(0, 0, 0, 0);
   for (let i = 0; i < 365; i++) {
     const key = cursor.toISOString().substring(0, 10);
     const dayPnl = dayMap.get(key);
-    if (dayPnl == null) {
-      cursor.setDate(cursor.getDate() - 1);
-      continue;
-    }
-    if (dayPnl > 0) {
+    if (dayPnl != null && dayPnl > 0) {
       streak++;
-      cursor.setDate(cursor.getDate() - 1);
     } else {
       break;
     }
+    cursor.setDate(cursor.getDate() - 1);
   }
 
   const last10 = trades.slice(0, 10);
   const disciplineCount = last10.filter((t) => (t.planAdherence ?? 0) >= 3).length;
-  const disciplineScore = last10.length > 0 ? disciplineCount : null;
-  const maxScore = last10.length;
+  const maxScore = Math.min(last10.length, 10);
 
   const streakColor = streak >= 3 ? Colors.green : streak >= 1 ? Colors.amber : Colors.textMuted;
+  const streakEmoji = streak >= 3 ? "🔥" : streak >= 1 ? "✅" : "📉";
   const disciplineColor = disciplineCount >= 7 ? Colors.green : disciplineCount >= 4 ? Colors.amber : Colors.red;
 
   return (
     <View style={styles.streakRow}>
       <View style={styles.streakItem}>
-        <Text style={styles.streakIcon}>{streak >= 3 ? "🔥" : streak >= 1 ? "✅" : "📉"}</Text>
+        <Text style={styles.streakIcon}>{streakEmoji}</Text>
         <View>
           <Text style={[styles.streakValue, { color: streakColor }]}>
-            {streak > 0 ? `${streak}-day streak` : "No streak yet"}
+            {streak > 0 ? `${streak}-day streak` : "0"}
           </Text>
           <Text style={styles.streakLabel}>Winning days</Text>
         </View>
@@ -283,7 +294,7 @@ function StreakRow({ trades }: { trades: Trade[] }) {
       <View style={styles.streakItem}>
         <Text style={styles.streakIcon}>📋</Text>
         <View>
-          {disciplineScore != null ? (
+          {maxScore > 0 ? (
             <Text style={[styles.streakValue, { color: disciplineColor }]}>
               {disciplineCount}/{maxScore}
             </Text>
@@ -325,7 +336,7 @@ export default function JournalScreen() {
         </Pressable>
       </View>
 
-      <AIInsightCard tradeCount={trades.length} onRefresh={onRefresh} />
+      <AIInsightCard tradeCount={trades.length} refreshing={refreshing} />
 
       {trades.length > 0 && <StatsBar trades={trades} />}
 
