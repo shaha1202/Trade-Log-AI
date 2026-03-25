@@ -140,7 +140,9 @@ function AIInsightCard({ tradeCount, refreshing }: { tradeCount: number; refresh
 type ContextLabel = { label: string; color: string } | null;
 
 function getContext(todayVal: number | null, histAvg: number | null, higherIsBetter: boolean): ContextLabel {
-  if (todayVal == null || histAvg == null || histAvg === 0) return { label: "—", color: Colors.textMuted };
+  if (todayVal == null || histAvg == null) return { label: "—", color: Colors.textMuted };
+  if (histAvg === 0 && todayVal === 0) return { label: "On track", color: Colors.amber };
+  if (histAvg === 0) return higherIsBetter ? { label: "Above avg", color: Colors.green } : { label: "Below avg", color: Colors.red };
   const ratio = todayVal / histAvg;
   if (higherIsBetter) {
     if (ratio >= 1.1) return { label: "Above avg", color: Colors.green };
@@ -215,7 +217,7 @@ function StatsBar({ trades }: { trades: Trade[] }) {
   const histAvgTradesPerDay = pastDaysMap.size > 0
     ? pastTrades.length / pastDaysMap.size
     : null;
-  const countContext = getContext(todayCount > 0 ? todayCount : null, histAvgTradesPerDay, true);
+  const countContext = getContext(todayCount, histAvgTradesPerDay, true);
 
   return (
     <View style={styles.statsBar}>
