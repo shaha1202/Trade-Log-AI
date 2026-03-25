@@ -901,7 +901,6 @@ const styles = StyleSheet.create({
   statsBar: {
     flexDirection: "row",
     backgroundColor: Colors.surface,
-    marginHorizontal: 16,
     marginBottom: 10,
     borderRadius: 16,
     paddingVertical: 12,
