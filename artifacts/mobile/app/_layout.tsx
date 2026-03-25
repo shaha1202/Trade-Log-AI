@@ -67,6 +67,14 @@ function RootLayoutNav() {
           }}
         />
         <Stack.Screen
+          name="paywall"
+          options={{
+            headerShown: false,
+            presentation: "fullScreenModal",
+            gestureEnabled: false,
+          }}
+        />
+        <Stack.Screen
           name="trade/[id]"
           options={{
             headerShown: false,

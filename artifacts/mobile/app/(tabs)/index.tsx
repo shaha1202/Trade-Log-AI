@@ -685,7 +685,13 @@ export default function JournalScreen() {
         <Text style={styles.title}>Journal</Text>
         <Pressable
           style={({ pressed }) => [styles.addBtn, { opacity: pressed ? 0.7 : 1 }]}
-          onPress={() => router.push("/(tabs)/add")}
+          onPress={() => {
+            if (trades.length >= 5) {
+              router.push("/paywall");
+            } else {
+              router.push("/(tabs)/add");
+            }
+          }}
         >
           <Feather name="plus" size={22} color={Colors.teal} />
         </Pressable>

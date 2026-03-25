@@ -1,9 +1,9 @@
 import { Feather } from "@expo/vector-icons";
-import { useCreateTrade } from "@workspace/api-client-react";
+import { useCreateTrade, useListTrades } from "@workspace/api-client-react";
 import * as Haptics from "expo-haptics";
 import * as ImagePicker from "expo-image-picker";
 import { router } from "expo-router";
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   Alert,
   Image,
@@ -297,6 +297,8 @@ function TagChip({
   );
 }
 
+const FREE_TRADE_LIMIT = 5;
+
 export default function AddTradeScreen() {
   const insets = useSafeAreaInsets();
   const [form, setForm] = useState<FormState>(defaultForm);
@@ -304,6 +306,15 @@ export default function AddTradeScreen() {
   const [imageUri, setImageUri] = useState<string | null>(null);
   const { mutateAsync: createTrade, isPending } = useCreateTrade();
   const { confluenceTags: CONFLUENCES } = useSettings();
+  const { data: tradeData } = useListTrades();
+
+  const tradeCount = tradeData?.trades?.length ?? 0;
+
+  useEffect(() => {
+    if (tradeCount >= FREE_TRADE_LIMIT) {
+      router.replace("/paywall");
+    }
+  }, [tradeCount]);
 
   const update = (key: keyof FormState, value: unknown) => {
     setForm((prev) => ({ ...prev, [key]: value }));
