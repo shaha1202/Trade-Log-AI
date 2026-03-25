@@ -1,0 +1,112 @@
+TradeLog — AI-Powered Trading Journal App
+Product Overview
+TradeLog is a mobile-first trading journal application that uses AI vision to automatically analyze trading chart screenshots and populate trade entries. The core value proposition: traders upload a screenshot, AI reads it, and the journal fills itself — eliminating the #1 reason traders stop journaling (manual data entry).
+
+Core User Flow
+
+User uploads an entry screenshot (TradingView, MT4, MT5)
+AI analyzes the chart and auto-fills trade data
+User reviews, adjusts, and completes remaining fields
+Trade is saved to the journal
+
+
+AI Chart Analysis — Critical Rules
+The AI must follow these rules when reading trading screenshots:
+Position Markers vs Zones:
+
+TradingView position markers appear as TWO vertically stacked rectangles
+Top rectangle = Stop Loss zone
+Bottom rectangle = Take Profit zone
+The boundary between the two rectangles = Entry price
+Identification must be based on POSITION (vertical layout), NOT color
+Do NOT confuse position markers with Supply/Demand zones — those are wider, horizontal, and usually labeled
+
+Direction Logic:
+
+SHORT: Entry is at top, SL above entry, TP below entry
+LONG: Entry is at bottom, SL below entry, TP above entry
+
+What AI extracts:
+
+Asset/pair (e.g. XAUUSD, EURUSD)
+Timeframe (M1, M5, M15, M30, H1, H4, D1)
+Session (Asian, London, New York, London+NY)
+Direction (LONG or SHORT)
+Entry price
+Stop Loss price
+Take Profit price
+HTF trend direction
+2–3 sentence narrative summary of the setup in the user's language
+
+What AI does NOT extract:
+
+Setup type/name — traders use different methodologies (SMC, Classic, ICT, Wyckoff, etc.) and must label this themselves
+
+
+Journal Entry Fields
+Section 1 — Trade Info (AI auto-filled, user can edit):
+
+Asset / Pair
+Timeframe
+Session
+Direction (Long / Short toggle)
+Entry price
+Stop Loss
+Take Profit
+R:R ratio (auto-calculated: |TP−Entry| / |Entry−SL|)
+
+Section 2 — Risk & Result (manual):
+
+Lot size
+Risk %
+P&L ($)
+Hold duration
+Result: Win / Loss / Break Even
+
+Section 3 — AI Analysis (auto-filled, read-only + editable):
+
+HTF Trend
+Confluence tags (multi-select): FVG, Order Block, Liquidity Sweep, Break of Structure, EMA 200, Support/Resistance, Session Open, HTF Trend, Fibonacci
+AI narrative (auto-generated, displayed as read-only block)
+
+Section 4 — Pre-trade Checklist:
+
+Direction aligns with HTF trend
+Minimum 2 confluences present
+R:R is at least 1:2
+Risk does not exceed 1–2%
+SL is placed beyond structure
+Economic calendar checked
+
+Section 5 — Psychology:
+
+Pre-trade mood (multi-select tags): Confident, Patient, Calm, Rushed, FOMO, Fearful, Stressed, Excited
+Plan adherence rating (1–5 stars)
+What I did well (text)
+What to improve (text)
+
+
+Navigation — 3 Tabs
+
+Journal — trade history list with summary stats (daily P&L, win rate, trade count, avg R:R). Each trade card shows: pair, P&L, direction pill, result pill, timeframe, AI badge, time
+Add Trade — the main flow described above
+Statistics — monthly P&L bar chart, win rate, best trade, avg R:R, total trades, profit factor
+
+
+Design Language
+
+Platform: Mobile-first (iOS native feel, Android compatible)
+Theme: Dark — background #0e0e10, surfaces layered (#1a1a1e, #242428)
+Typography: Clean sans-serif, monospace for numbers/prices
+AI-filled fields: visually distinct (teal tint, AI badge)
+Color coding: Green for long/win/profit, Red for short/loss, Amber for break-even/warnings, Teal for AI elements, Purple for confluence tags
+Components: Bottom navigation bar, pill badges, toggle buttons, tag chips, star rating, animated scan progress
+
+
+Technical Notes
+
+AI model: Claude Vision (claude-sonnet) via Anthropic API
+Image input: Base64 encoded, supports PNG/JPG
+AI response format: Structured JSON
+R:R calculated client-side from entry/SL/TP values
+All AI-filled fields remain editable by user
