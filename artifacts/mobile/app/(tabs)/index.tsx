@@ -998,7 +998,6 @@ const styles = StyleSheet.create({
     marginHorizontal: 8,
   },
   badgeScroll: {
-    paddingHorizontal: 16,
     paddingBottom: 10,
     gap: 8,
     flexDirection: "row",
