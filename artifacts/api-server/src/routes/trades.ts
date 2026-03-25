@@ -1,4 +1,5 @@
 import { db, tradesTable } from "@workspace/db";
+import type { Trade } from "@workspace/db";
 import { anthropic } from "@workspace/integrations-anthropic-ai";
 import { and, count, desc, eq, sql } from "drizzle-orm";
 import { Router, type IRouter } from "express";
@@ -194,7 +195,7 @@ router.patch("/trades/:id", async (req, res) => {
       return;
     }
     const body = req.body;
-    const updateData: Record<string, unknown> = { updatedAt: new Date() };
+    const updateData: Partial<Trade> & { updatedAt: Date } = { updatedAt: new Date() };
 
     if (body.asset !== undefined) updateData.asset = body.asset;
     if (body.timeframe !== undefined) updateData.timeframe = body.timeframe;
@@ -227,7 +228,7 @@ router.patch("/trades/:id", async (req, res) => {
 
     const [updated] = await db
       .update(tradesTable)
-      .set(updateData as Parameters<typeof db.update>[0] extends infer T ? Record<string, unknown> : never)
+      .set(updateData)
       .where(eq(tradesTable.id, id))
       .returning();
 

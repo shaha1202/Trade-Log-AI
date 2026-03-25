@@ -104,22 +104,27 @@ function TradeCard({ trade }: { trade: Trade }) {
 
 function StatsBar({ trades }: { trades: Trade[] }) {
   if (trades.length === 0) return null;
-  const wins = trades.filter((t) => t.result === "win").length;
-  const winRate = trades.length > 0 ? (wins / trades.length) * 100 : 0;
-  const totalPnl = trades.reduce((s, t) => s + (t.pnl ?? 0), 0);
-  const rrs = trades.filter((t) => t.rr != null).map((t) => t.rr!);
+
+  const todayStart = new Date();
+  todayStart.setHours(0, 0, 0, 0);
+  const todayTrades = trades.filter((t) => new Date(t.createdAt) >= todayStart);
+
+  const wins = todayTrades.filter((t) => t.result === "win").length;
+  const winRate = todayTrades.length > 0 ? (wins / todayTrades.length) * 100 : 0;
+  const dailyPnl = todayTrades.reduce((s, t) => s + (t.pnl ?? 0), 0);
+  const rrs = todayTrades.filter((t) => t.rr != null).map((t) => t.rr!);
   const avgRr = rrs.length > 0 ? rrs.reduce((a, b) => a + b, 0) / rrs.length : 0;
 
   return (
     <View style={styles.statsBar}>
       <View style={styles.statItem}>
-        <Text style={styles.statValue}>{trades.length}</Text>
-        <Text style={styles.statLabel}>Trades</Text>
+        <Text style={styles.statValue}>{todayTrades.length}</Text>
+        <Text style={styles.statLabel}>Today</Text>
       </View>
       <View style={styles.statDivider} />
       <View style={styles.statItem}>
-        <Text style={[styles.statValue, { color: winRate >= 50 ? Colors.green : Colors.red }]}>
-          {winRate.toFixed(0)}%
+        <Text style={[styles.statValue, { color: winRate >= 50 ? Colors.green : todayTrades.length > 0 ? Colors.red : Colors.textSecondary }]}>
+          {todayTrades.length > 0 ? `${winRate.toFixed(0)}%` : "—"}
         </Text>
         <Text style={styles.statLabel}>Win Rate</Text>
       </View>
@@ -128,17 +133,19 @@ function StatsBar({ trades }: { trades: Trade[] }) {
         <Text
           style={[
             styles.statValue,
-            { color: totalPnl > 0 ? Colors.green : totalPnl < 0 ? Colors.red : Colors.textSecondary },
+            { color: dailyPnl > 0 ? Colors.green : dailyPnl < 0 ? Colors.red : Colors.textSecondary },
           ]}
         >
-          {totalPnl > 0 ? "+" : ""}
-          {totalPnl.toFixed(2)}
+          {dailyPnl > 0 ? "+" : ""}
+          {todayTrades.length > 0 ? dailyPnl.toFixed(2) : "—"}
         </Text>
-        <Text style={styles.statLabel}>P&L</Text>
+        <Text style={styles.statLabel}>Daily P&L</Text>
       </View>
       <View style={styles.statDivider} />
       <View style={styles.statItem}>
-        <Text style={[styles.statValue, { color: Colors.teal }]}>{avgRr.toFixed(2)}R</Text>
+        <Text style={[styles.statValue, { color: Colors.teal }]}>
+          {avgRr > 0 ? `${avgRr.toFixed(2)}R` : "—"}
+        </Text>
         <Text style={styles.statLabel}>Avg R:R</Text>
       </View>
     </View>
