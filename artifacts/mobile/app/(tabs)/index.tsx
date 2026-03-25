@@ -331,7 +331,7 @@ function SparklineCard({ trades }: { trades: Trade[] }) {
   if (trades.length === 0) return null;
 
   const now = new Date();
-  const days: { label: string; pnl: number; hasData: boolean }[] = [];
+  const dailyPnls: { label: string; dailyPnl: number; hasData: boolean }[] = [];
   for (let i = 6; i >= 0; i--) {
     const d = new Date(now);
     d.setDate(d.getDate() - i);
@@ -340,11 +340,18 @@ function SparklineCard({ trades }: { trades: Trade[] }) {
     const dayTrades = trades.filter((t) => t.createdAt.substring(0, 10) === key);
     const pnl = dayTrades.reduce((s, t) => s + (t.pnl ?? 0), 0);
     const dayLabel = i === 0 ? "Today" : d.toLocaleDateString([], { weekday: "short" });
-    days.push({ label: dayLabel, pnl, hasData: dayTrades.length > 0 });
+    dailyPnls.push({ label: dayLabel, dailyPnl: pnl, hasData: dayTrades.length > 0 });
   }
 
-  const hasSomeData = days.some((d) => d.hasData);
+  const hasSomeData = dailyPnls.some((d) => d.hasData);
   if (!hasSomeData) return null;
+
+  const cumulativePnls: number[] = [];
+  let running = 0;
+  for (const d of dailyPnls) {
+    running += d.dailyPnl;
+    cumulativePnls.push(running);
+  }
 
   const W = SCREEN_W - 32;
   const H = 64;
@@ -353,18 +360,19 @@ function SparklineCard({ trades }: { trades: Trade[] }) {
   const innerW = W - PAD_X * 2;
   const innerH = H - PAD_Y * 2;
 
-  const pnls = days.map((d) => d.pnl);
-  const maxAbs = Math.max(1, ...pnls.map(Math.abs));
-  const midY = PAD_Y + innerH / 2;
+  const minCum = Math.min(...cumulativePnls);
+  const maxCum = Math.max(...cumulativePnls);
+  const range = Math.max(1, maxCum - minCum);
 
-  const points = days.map((d, i) => {
+  const points = dailyPnls.map((d, i) => {
     const x = PAD_X + (i / 6) * innerW;
-    const y = midY - (d.pnl / maxAbs) * (innerH / 2);
-    return { x, y, pnl: d.pnl, label: d.label, hasData: d.hasData };
+    const cumVal = cumulativePnls[i];
+    const y = PAD_Y + innerH - ((cumVal - minCum) / range) * innerH;
+    return { x, y, cumVal, label: d.label, hasData: d.hasData };
   });
 
   const polylineStr = points.map((p) => `${p.x},${p.y}`).join(" ");
-  const netTrend = pnls[pnls.length - 1] - pnls[0];
+  const netTrend = cumulativePnls[cumulativePnls.length - 1];
   const lineColor = netTrend >= 0 ? Colors.green : Colors.red;
 
   return (
@@ -377,7 +385,7 @@ function SparklineCard({ trades }: { trades: Trade[] }) {
       </View>
       <Svg width={W} height={H + 20}>
         <G>
-          <Line x1={PAD_X} y1={midY} x2={W - PAD_X} y2={midY} stroke={Colors.border} strokeWidth={1} />
+          <Line x1={PAD_X} y1={PAD_Y + innerH} x2={W - PAD_X} y2={PAD_Y + innerH} stroke={Colors.border} strokeWidth={1} />
           <Polyline
             points={polylineStr}
             fill="none"
@@ -413,8 +421,6 @@ function SparklineCard({ trades }: { trades: Trade[] }) {
 }
 
 function CalendarHeatmap({ trades }: { trades: Trade[] }) {
-  if (trades.length === 0) return null;
-
   const dayPnlMap = new Map<string, number>();
   for (const t of trades) {
     const key = t.createdAt.substring(0, 10);
@@ -515,8 +521,8 @@ function DailyGoalCard({ trades, goal }: { trades: Trade[]; goal: number }) {
 
   const todayStart = new Date();
   todayStart.setHours(0, 0, 0, 0);
-  const todayTrades = trades.filter((t) => new Date(t.createdAt) >= todayStart);
-  const todayPnl = todayTrades.reduce((s, t) => s + (t.pnl ?? 0), 0);
+  const todayPnl = trades.filter((t) => new Date(t.createdAt) >= todayStart)
+    .reduce((s, t) => s + (t.pnl ?? 0), 0);
 
   const progress = Math.min(Math.max(todayPnl / goal, 0), 1);
   const pct = Math.round(progress * 100);
@@ -704,12 +710,12 @@ export default function JournalScreen() {
         ListHeaderComponent={
           <>
             <AIInsightCard tradeCount={trades.length} refreshing={refreshing} />
-            {trades.length > 0 && <DailyGoalCard trades={trades} goal={dailyGoalPnl} />}
+            <DailyGoalCard trades={trades} goal={dailyGoalPnl} />
             {trades.length > 0 && <StatsBar trades={trades} />}
             {trades.length > 0 && <SparklineCard trades={trades} />}
             {trades.length > 0 && <StreakRow trades={trades} />}
             {trades.length > 0 && <BadgeRow trades={trades} />}
-            {trades.length > 0 && <CalendarHeatmap trades={trades} />}
+            <CalendarHeatmap trades={trades} />
             {trades.length > 0 && (
               <Text style={styles.sectionHeader}>Recent Trades</Text>
             )}
