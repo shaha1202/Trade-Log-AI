@@ -1040,7 +1040,6 @@ const styles = StyleSheet.create({
     color: Colors.textMuted,
   },
   calCard: {
-    marginHorizontal: 16,
     marginBottom: 10,
     backgroundColor: Colors.surface,
     borderRadius: 16,
