@@ -936,7 +936,7 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
     paddingVertical: 7,
-    borderBottomWidth: 1,
+    borderBottomWidth: 0,
     borderBottomColor: Colors.border,
   },
   dataLabel: {
