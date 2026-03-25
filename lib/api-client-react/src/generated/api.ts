@@ -17,6 +17,7 @@ import type {
 } from "@tanstack/react-query";
 
 import type {
+  AIInsightResponse,
   AnalyzeTradeRequest,
   CreateTradeRequest,
   ErrorResponse,
@@ -635,6 +636,81 @@ export const useDeleteTrade = <
 > => {
   return useMutation(getDeleteTradeMutationOptions(options));
 };
+
+/**
+ * @summary Get AI-generated insight from recent trades
+ */
+export const getGetAiInsightUrl = () => {
+  return `/api/trades/ai-insight`;
+};
+
+export const getAiInsight = async (
+  options?: RequestInit,
+): Promise<AIInsightResponse> => {
+  return customFetch<AIInsightResponse>(getGetAiInsightUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetAiInsightQueryKey = () => {
+  return [`/api/trades/ai-insight`] as const;
+};
+
+export const getGetAiInsightQueryOptions = <
+  TData = Awaited<ReturnType<typeof getAiInsight>>,
+  TError = ErrorType<ErrorResponse>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getAiInsight>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGetAiInsightQueryKey();
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getAiInsight>>> = ({
+    signal,
+  }) => getAiInsight({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getAiInsight>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetAiInsightQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getAiInsight>>
+>;
+export type GetAiInsightQueryError = ErrorType<ErrorResponse>;
+
+/**
+ * @summary Get AI-generated insight from recent trades
+ */
+
+export function useGetAiInsight<
+  TData = Awaited<ReturnType<typeof getAiInsight>>,
+  TError = ErrorType<ErrorResponse>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getAiInsight>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetAiInsightQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
 
 /**
  * @summary Get aggregate trade statistics

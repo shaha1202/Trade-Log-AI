@@ -241,6 +241,13 @@ export const DeleteTradeParams = zod.object({
 });
 
 /**
+ * @summary Get AI-generated insight from recent trades
+ */
+export const GetAiInsightResponse = zod.object({
+  insight: zod.string(),
+});
+
+/**
  * @summary Get aggregate trade statistics
  */
 export const GetTradeStatsResponse = zod.object({

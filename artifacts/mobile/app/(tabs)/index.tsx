@@ -1,8 +1,9 @@
 import { Feather } from "@expo/vector-icons";
-import { useListTrades } from "@workspace/api-client-react";
+import { useGetAiInsight, useListTrades } from "@workspace/api-client-react";
 import { router } from "expo-router";
 import React, { useCallback, useState } from "react";
 import {
+  ActivityIndicator,
   FlatList,
   Platform,
   Pressable,
@@ -23,6 +24,7 @@ type Trade = {
   result?: "win" | "loss" | "breakeven" | null;
   pnl?: number | null;
   rr?: number | null;
+  planAdherence?: number | null;
   aiAnalyzed: boolean;
   createdAt: string;
 };
@@ -102,6 +104,69 @@ function TradeCard({ trade }: { trade: Trade }) {
   );
 }
 
+function AIInsightCard({ tradeCount, onRefresh }: { tradeCount: number; onRefresh: () => void }) {
+  const { data, isLoading } = useGetAiInsight({ query: { staleTime: 5 * 60 * 1000 } });
+
+  if (tradeCount === 0) return null;
+
+  return (
+    <View style={styles.insightCard}>
+      <View style={styles.insightHeader}>
+        <View style={styles.insightChip}>
+          <Feather name="cpu" size={10} color={Colors.teal} />
+          <Text style={styles.insightChipText}>AI Insight</Text>
+        </View>
+      </View>
+      {isLoading ? (
+        <View style={styles.insightLoading}>
+          <ActivityIndicator size="small" color={Colors.teal} />
+          <Text style={styles.insightLoadingText}>Analyzing your trades...</Text>
+        </View>
+      ) : (
+        <Text style={styles.insightText}>{data?.insight ?? "Keep logging trades to unlock personalized AI insights."}</Text>
+      )}
+    </View>
+  );
+}
+
+type ContextLabel = { label: string; color: string } | null;
+
+function getContext(todayVal: number | null, histAvg: number | null, higherIsBetter: boolean): ContextLabel {
+  if (todayVal == null || histAvg == null || histAvg === 0) return null;
+  const ratio = todayVal / histAvg;
+  if (higherIsBetter) {
+    if (ratio >= 1.1) return { label: "Above avg", color: Colors.green };
+    if (ratio >= 0.85) return { label: "On track", color: Colors.amber };
+    return { label: "Below avg", color: Colors.red };
+  } else {
+    if (ratio <= 0.9) return { label: "Above avg", color: Colors.green };
+    if (ratio <= 1.15) return { label: "On track", color: Colors.amber };
+    return { label: "Below avg", color: Colors.red };
+  }
+}
+
+function StatItem({
+  value,
+  label,
+  context,
+}: {
+  value: string;
+  label: string;
+  context: ContextLabel;
+}) {
+  return (
+    <View style={styles.statItem}>
+      <Text style={styles.statValue}>{value}</Text>
+      <Text style={styles.statLabel}>{label}</Text>
+      {context ? (
+        <Text style={[styles.statContext, { color: context.color }]}>{context.label}</Text>
+      ) : (
+        <View style={{ height: 14 }} />
+      )}
+    </View>
+  );
+}
+
 function StatsBar({ trades }: { trades: Trade[] }) {
   if (trades.length === 0) return null;
 
@@ -109,44 +174,124 @@ function StatsBar({ trades }: { trades: Trade[] }) {
   todayStart.setHours(0, 0, 0, 0);
   const todayTrades = trades.filter((t) => new Date(t.createdAt) >= todayStart);
 
-  const wins = todayTrades.filter((t) => t.result === "win").length;
-  const winRate = todayTrades.length > 0 ? (wins / todayTrades.length) * 100 : 0;
-  const dailyPnl = todayTrades.reduce((s, t) => s + (t.pnl ?? 0), 0);
-  const rrs = todayTrades.filter((t) => t.rr != null).map((t) => t.rr!);
-  const avgRr = rrs.length > 0 ? rrs.reduce((a, b) => a + b, 0) / rrs.length : 0;
+  const todayWins = todayTrades.filter((t) => t.result === "win").length;
+  const todayWinRate = todayTrades.length > 0 ? (todayWins / todayTrades.length) * 100 : null;
+  const todayPnl = todayTrades.length > 0 ? todayTrades.reduce((s, t) => s + (t.pnl ?? 0), 0) : null;
+  const todayRrs = todayTrades.filter((t) => t.rr != null).map((t) => t.rr!);
+  const todayAvgRr = todayRrs.length > 0 ? todayRrs.reduce((a, b) => a + b, 0) / todayRrs.length : null;
+
+  const pastTrades = trades.filter((t) => new Date(t.createdAt) < todayStart);
+  const pastDaysMap = new Map<string, { pnl: number }>();
+  for (const t of pastTrades) {
+    const key = t.createdAt.substring(0, 10);
+    const d = pastDaysMap.get(key) ?? { pnl: 0 };
+    d.pnl += t.pnl ?? 0;
+    pastDaysMap.set(key, d);
+  }
+  const pastDayPnls = Array.from(pastDaysMap.values()).map((d) => d.pnl);
+  const histAvgDailyPnl = pastDayPnls.length > 0 ? pastDayPnls.reduce((a, b) => a + b, 0) / pastDayPnls.length : null;
+
+  const pastWins = pastTrades.filter((t) => t.result === "win").length;
+  const histWinRate = pastTrades.length > 0 ? (pastWins / pastTrades.length) * 100 : null;
+
+  const pastRrs = pastTrades.filter((t) => t.rr != null).map((t) => t.rr!);
+  const histAvgRr = pastRrs.length > 0 ? pastRrs.reduce((a, b) => a + b, 0) / pastRrs.length : null;
+
+  const winRateContext = getContext(todayWinRate, histWinRate, true);
+  const pnlContext = getContext(todayPnl, histAvgDailyPnl, true);
+  const rrContext = getContext(todayAvgRr, histAvgRr, true);
 
   return (
     <View style={styles.statsBar}>
-      <View style={styles.statItem}>
-        <Text style={styles.statValue}>{todayTrades.length}</Text>
-        <Text style={styles.statLabel}>Today</Text>
-      </View>
+      <StatItem
+        value={String(todayTrades.length)}
+        label="Today"
+        context={null}
+      />
       <View style={styles.statDivider} />
-      <View style={styles.statItem}>
-        <Text style={[styles.statValue, { color: winRate >= 50 ? Colors.green : todayTrades.length > 0 ? Colors.red : Colors.textSecondary }]}>
-          {todayTrades.length > 0 ? `${winRate.toFixed(0)}%` : "—"}
-        </Text>
-        <Text style={styles.statLabel}>Win Rate</Text>
-      </View>
+      <StatItem
+        value={todayWinRate != null ? `${todayWinRate.toFixed(0)}%` : "—"}
+        label="Win Rate"
+        context={winRateContext}
+      />
       <View style={styles.statDivider} />
-      <View style={styles.statItem}>
-        <Text
-          style={[
-            styles.statValue,
-            { color: dailyPnl > 0 ? Colors.green : dailyPnl < 0 ? Colors.red : Colors.textSecondary },
-          ]}
-        >
-          {dailyPnl > 0 ? "+" : ""}
-          {todayTrades.length > 0 ? dailyPnl.toFixed(2) : "—"}
-        </Text>
-        <Text style={styles.statLabel}>Daily P&L</Text>
-      </View>
+      <StatItem
+        value={todayPnl != null ? `${todayPnl >= 0 ? "+" : ""}${todayPnl.toFixed(2)}` : "—"}
+        label="Daily P&L"
+        context={pnlContext}
+      />
       <View style={styles.statDivider} />
-      <View style={styles.statItem}>
-        <Text style={[styles.statValue, { color: Colors.teal }]}>
-          {avgRr > 0 ? `${avgRr.toFixed(2)}R` : "—"}
-        </Text>
-        <Text style={styles.statLabel}>Avg R:R</Text>
+      <StatItem
+        value={todayAvgRr != null ? `${todayAvgRr.toFixed(2)}R` : "—"}
+        label="Avg R:R"
+        context={rrContext}
+      />
+    </View>
+  );
+}
+
+function StreakRow({ trades }: { trades: Trade[] }) {
+  if (trades.length === 0) return null;
+
+  const todayStart = new Date();
+  todayStart.setHours(0, 0, 0, 0);
+
+  const dayMap = new Map<string, number>();
+  for (const t of trades) {
+    const key = t.createdAt.substring(0, 10);
+    dayMap.set(key, (dayMap.get(key) ?? 0) + (t.pnl ?? 0));
+  }
+
+  let streak = 0;
+  const cursor = new Date(todayStart);
+  cursor.setDate(cursor.getDate() - 1);
+  for (let i = 0; i < 365; i++) {
+    const key = cursor.toISOString().substring(0, 10);
+    const dayPnl = dayMap.get(key);
+    if (dayPnl == null) {
+      cursor.setDate(cursor.getDate() - 1);
+      continue;
+    }
+    if (dayPnl > 0) {
+      streak++;
+      cursor.setDate(cursor.getDate() - 1);
+    } else {
+      break;
+    }
+  }
+
+  const last10 = trades.slice(0, 10);
+  const disciplineCount = last10.filter((t) => (t.planAdherence ?? 0) >= 3).length;
+  const disciplineScore = last10.length > 0 ? disciplineCount : null;
+  const maxScore = last10.length;
+
+  const streakColor = streak >= 3 ? Colors.green : streak >= 1 ? Colors.amber : Colors.textMuted;
+  const disciplineColor = disciplineCount >= 7 ? Colors.green : disciplineCount >= 4 ? Colors.amber : Colors.red;
+
+  return (
+    <View style={styles.streakRow}>
+      <View style={styles.streakItem}>
+        <Text style={styles.streakIcon}>{streak >= 3 ? "🔥" : streak >= 1 ? "✅" : "📉"}</Text>
+        <View>
+          <Text style={[styles.streakValue, { color: streakColor }]}>
+            {streak > 0 ? `${streak}-day streak` : "No streak yet"}
+          </Text>
+          <Text style={styles.streakLabel}>Winning days</Text>
+        </View>
+      </View>
+      <View style={styles.streakDivider} />
+      <View style={styles.streakItem}>
+        <Text style={styles.streakIcon}>📋</Text>
+        <View>
+          {disciplineScore != null ? (
+            <Text style={[styles.streakValue, { color: disciplineColor }]}>
+              {disciplineCount}/{maxScore}
+            </Text>
+          ) : (
+            <Text style={[styles.streakValue, { color: Colors.textMuted }]}>—</Text>
+          )}
+          <Text style={styles.streakLabel}>Discipline score</Text>
+        </View>
       </View>
     </View>
   );
@@ -180,7 +325,11 @@ export default function JournalScreen() {
         </Pressable>
       </View>
 
+      <AIInsightCard tradeCount={trades.length} onRefresh={onRefresh} />
+
       {trades.length > 0 && <StatsBar trades={trades} />}
+
+      {trades.length > 0 && <StreakRow trades={trades} />}
 
       <FlatList
         data={trades}
@@ -244,35 +393,130 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
+  insightCard: {
+    marginHorizontal: 16,
+    marginBottom: 12,
+    backgroundColor: Colors.tealDim,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: Colors.teal,
+    padding: 14,
+    gap: 8,
+  },
+  insightHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  insightChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    backgroundColor: Colors.tealMuted,
+    borderRadius: 6,
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    borderWidth: 1,
+    borderColor: Colors.teal,
+  },
+  insightChipText: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 10,
+    color: Colors.teal,
+    letterSpacing: 0.5,
+  },
+  insightLoading: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  insightLoadingText: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 13,
+    color: Colors.textSecondary,
+    fontStyle: "italic",
+  },
+  insightText: {
+    fontFamily: "Inter_500Medium",
+    fontSize: 14,
+    color: Colors.text,
+    lineHeight: 20,
+  },
   statsBar: {
     flexDirection: "row",
     backgroundColor: Colors.surface,
     marginHorizontal: 16,
-    marginBottom: 12,
+    marginBottom: 10,
     borderRadius: 16,
-    padding: 16,
-    alignItems: "center",
+    paddingVertical: 12,
+    paddingHorizontal: 8,
+    alignItems: "flex-start",
+    borderWidth: 1,
+    borderColor: Colors.border,
   },
   statItem: {
     flex: 1,
     alignItems: "center",
+    gap: 2,
   },
   statValue: {
     fontFamily: "Inter_700Bold",
-    fontSize: 16,
+    fontSize: 15,
     color: Colors.text,
     fontVariant: ["tabular-nums"],
   },
   statLabel: {
     fontFamily: "Inter_400Regular",
-    fontSize: 11,
+    fontSize: 10,
     color: Colors.textMuted,
-    marginTop: 2,
+  },
+  statContext: {
+    fontFamily: "Inter_500Medium",
+    fontSize: 9,
+    letterSpacing: 0.2,
   },
   statDivider: {
     width: 1,
-    height: 28,
+    height: 42,
     backgroundColor: Colors.border,
+    alignSelf: "center",
+  },
+  streakRow: {
+    flexDirection: "row",
+    backgroundColor: Colors.surface,
+    marginHorizontal: 16,
+    marginBottom: 10,
+    borderRadius: 16,
+    padding: 12,
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  streakItem: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    paddingHorizontal: 4,
+  },
+  streakIcon: {
+    fontSize: 22,
+  },
+  streakValue: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 14,
+    fontVariant: ["tabular-nums"],
+  },
+  streakLabel: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 10,
+    color: Colors.textMuted,
+    marginTop: 1,
+  },
+  streakDivider: {
+    width: 1,
+    height: 36,
+    backgroundColor: Colors.border,
+    marginHorizontal: 8,
   },
   list: {
     paddingHorizontal: 16,

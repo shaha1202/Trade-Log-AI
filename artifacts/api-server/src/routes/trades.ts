@@ -125,6 +125,95 @@ router.get("/trades/stats/summary", async (req, res) => {
   }
 });
 
+router.get("/trades/ai-insight", async (req, res) => {
+  try {
+    const recentTrades = await db
+      .select()
+      .from(tradesTable)
+      .orderBy(desc(tradesTable.createdAt))
+      .limit(20);
+
+    if (recentTrades.length < 3) {
+      res.json({ insight: "Log at least 3 trades to receive personalized AI insights." });
+      return;
+    }
+
+    const totalTrades = recentTrades.length;
+    const wins = recentTrades.filter((t) => t.result === "win").length;
+    const losses = recentTrades.filter((t) => t.result === "loss").length;
+    const winRate = totalTrades > 0 ? Math.round((wins / totalTrades) * 100) : 0;
+
+    const sessionMap = new Map<string, { wins: number; total: number }>();
+    const confluenceMap = new Map<string, { wins: number; total: number }>();
+    const assetMap = new Map<string, { wins: number; total: number }>();
+
+    for (const t of recentTrades) {
+      if (t.session) {
+        const s = sessionMap.get(t.session) ?? { wins: 0, total: 0 };
+        s.total++;
+        if (t.result === "win") s.wins++;
+        sessionMap.set(t.session, s);
+      }
+      for (const c of (t.confluences ?? [])) {
+        const cv = confluenceMap.get(c) ?? { wins: 0, total: 0 };
+        cv.total++;
+        if (t.result === "win") cv.wins++;
+        confluenceMap.set(c, cv);
+      }
+      const a = assetMap.get(t.asset) ?? { wins: 0, total: 0 };
+      a.total++;
+      if (t.result === "win") a.wins++;
+      assetMap.set(t.asset, a);
+    }
+
+    const sessionSummary = Array.from(sessionMap.entries())
+      .map(([s, v]) => `${s}: ${v.wins}/${v.total} wins`)
+      .join(", ");
+
+    const confluenceSummary = Array.from(confluenceMap.entries())
+      .sort((a, b) => b[1].total - a[1].total)
+      .slice(0, 5)
+      .map(([c, v]) => `${c}: ${Math.round((v.wins / v.total) * 100)}% win rate (${v.total} trades)`)
+      .join(", ");
+
+    const assetSummary = Array.from(assetMap.entries())
+      .map(([a, v]) => `${a}: ${v.wins}/${v.total} wins`)
+      .join(", ");
+
+    const recentResults = recentTrades
+      .slice(0, 10)
+      .map((t) => `${t.asset} ${t.direction} ${t.result ?? "pending"} ${t.session ?? ""} planAdherence:${t.planAdherence ?? "N/A"}`)
+      .join("\n");
+
+    const prompt = `You are a trading coach analyzing a trader's recent performance. Based on the data below, give ONE specific, actionable insight in 1-2 sentences. Be direct, specific, and motivating. Focus on what pattern stands out most — either a strength to leverage or a weakness to fix.
+
+Recent ${totalTrades} trades — Overall win rate: ${winRate}% (${wins} wins, ${losses} losses)
+Sessions: ${sessionSummary || "not tracked"}
+Confluences: ${confluenceSummary || "not tracked"}
+Assets: ${assetSummary}
+Recent trade log:
+${recentResults}
+
+Return ONLY the insight text, no labels or explanations. Keep it under 120 characters.`;
+
+    const message = await anthropic.messages.create({
+      model: "claude-sonnet-4-6",
+      max_tokens: 256,
+      messages: [{ role: "user", content: prompt }],
+    });
+
+    const textBlock = message.content.find((b) => b.type === "text");
+    const insight = textBlock && textBlock.type === "text"
+      ? textBlock.text.trim()
+      : "Keep logging trades to unlock personalized AI insights.";
+
+    res.json({ insight });
+  } catch (err) {
+    req.log.error({ err }, "Failed to generate AI insight");
+    res.status(500).json({ error: "ai_error", message: "Failed to generate insight" });
+  }
+});
+
 router.get("/trades/:id", async (req, res) => {
   try {
     const id = parseInt(req.params.id);

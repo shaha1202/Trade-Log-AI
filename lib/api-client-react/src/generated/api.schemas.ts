@@ -223,6 +223,10 @@ export interface TradeStats {
   monthlyPnl: MonthlyPnl[];
 }
 
+export interface AIInsightResponse {
+  insight: string;
+}
+
 export type ListTradesParams = {
   limit?: number;
   offset?: number;
