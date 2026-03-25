@@ -123,6 +123,8 @@ const chart = StyleSheet.create({
   },
 });
 
+type FeatherIconName = React.ComponentProps<typeof Feather>["name"];
+
 function StatCard({
   label,
   value,
@@ -132,12 +134,12 @@ function StatCard({
   label: string;
   value: string;
   color?: string;
-  icon?: string;
+  icon?: FeatherIconName;
 }) {
   return (
     <View style={styles.statCard}>
       {icon && (
-        <Feather name={icon as any} size={18} color={color ?? Colors.textSecondary} style={{ marginBottom: 8 }} />
+        <Feather name={icon} size={18} color={color ?? Colors.textSecondary} style={{ marginBottom: 8 }} />
       )}
       <Text style={[styles.statValue, color ? { color } : {}]}>{value}</Text>
       <Text style={styles.statLabel}>{label}</Text>
