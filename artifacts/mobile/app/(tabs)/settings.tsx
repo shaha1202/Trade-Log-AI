@@ -45,14 +45,17 @@ export default function SettingsScreen() {
     confluenceTags,
     dailyReminderEnabled,
     weeklySummaryEnabled,
+    dailyGoalPnl,
     updateProfileName,
     updateChecklistItems,
     updateConfluenceTags,
     updateDailyReminder,
     updateWeeklySummary,
+    updateDailyGoalPnl,
   } = useSettings();
 
   const [nameInput, setNameInput] = useState(profileName);
+  const [goalInput, setGoalInput] = useState(dailyGoalPnl > 0 ? String(dailyGoalPnl) : "");
   const [newChecklistItem, setNewChecklistItem] = useState("");
   const [newTag, setNewTag] = useState("");
 
@@ -60,12 +63,25 @@ export default function SettingsScreen() {
     setNameInput(profileName);
   }, [profileName]);
 
+  React.useEffect(() => {
+    setGoalInput(dailyGoalPnl > 0 ? String(dailyGoalPnl) : "");
+  }, [dailyGoalPnl]);
+
   const topPad = Platform.OS === "web" ? 67 : insets.top;
   const bottomPad = Platform.OS === "web" ? 34 + 84 : insets.bottom + 100;
 
   const handleSaveName = () => {
     updateProfileName(nameInput);
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+  };
+
+  const handleSaveGoal = () => {
+    const parsed = parseFloat(goalInput.replace(",", "."));
+    const goal = isNaN(parsed) || parsed < 0 ? 0 : parsed;
+    updateDailyGoalPnl(goal);
+    if (!isNaN(parsed) && parsed > 0) {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    }
   };
 
   const handleAddChecklistItem = () => {
@@ -141,6 +157,26 @@ export default function SettingsScreen() {
                   onBlur={handleSaveName}
                   returnKeyType="done"
                   onSubmitEditing={handleSaveName}
+                />
+              </View>
+            </View>
+            <View style={[styles.goalRow, { borderTopWidth: 1, borderTopColor: Colors.border }]}>
+              <View style={styles.goalLabelWrap}>
+                <Text style={styles.inputLabel}>Daily P&L Goal</Text>
+                <Text style={styles.goalDesc}>Show a progress bar on the Journal</Text>
+              </View>
+              <View style={styles.goalInputWrap}>
+                <Text style={styles.goalCurrency}>$</Text>
+                <TextInput
+                  value={goalInput}
+                  onChangeText={setGoalInput}
+                  placeholder="0"
+                  placeholderTextColor={Colors.textMuted}
+                  style={styles.goalInput}
+                  keyboardType="decimal-pad"
+                  onBlur={handleSaveGoal}
+                  returnKeyType="done"
+                  onSubmitEditing={handleSaveGoal}
                 />
               </View>
             </View>
@@ -356,6 +392,46 @@ const styles = StyleSheet.create({
     fontSize: 15,
     paddingHorizontal: 12,
     paddingVertical: 10,
+  },
+  goalRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+  },
+  goalLabelWrap: {
+    flex: 1,
+  },
+  goalDesc: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 11,
+    color: Colors.textMuted,
+    marginTop: 2,
+  },
+  goalInputWrap: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: Colors.surface2,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    minWidth: 90,
+  },
+  goalCurrency: {
+    fontFamily: "Inter_500Medium",
+    fontSize: 15,
+    color: Colors.teal,
+    marginRight: 4,
+  },
+  goalInput: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 15,
+    color: Colors.text,
+    minWidth: 60,
+    fontVariant: ["tabular-nums"],
   },
   subRow: {
     flexDirection: "row",

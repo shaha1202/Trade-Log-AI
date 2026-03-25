@@ -28,6 +28,7 @@ type Settings = {
   confluenceTags: string[];
   dailyReminderEnabled: boolean;
   weeklySummaryEnabled: boolean;
+  dailyGoalPnl: number;
 };
 
 const STORAGE_KEY = "tradelog_settings";
@@ -38,6 +39,7 @@ const defaultSettings: Settings = {
   confluenceTags: DEFAULT_CONFLUENCE_TAGS,
   dailyReminderEnabled: false,
   weeklySummaryEnabled: false,
+  dailyGoalPnl: 0,
 };
 
 export function useSettings() {
@@ -88,6 +90,11 @@ export function useSettings() {
     [settings, save]
   );
 
+  const updateDailyGoalPnl = useCallback(
+    (goal: number) => save({ ...settings, dailyGoalPnl: goal }),
+    [settings, save]
+  );
+
   return {
     loaded,
     profileName: settings.profileName,
@@ -95,10 +102,12 @@ export function useSettings() {
     confluenceTags: settings.confluenceTags,
     dailyReminderEnabled: settings.dailyReminderEnabled,
     weeklySummaryEnabled: settings.weeklySummaryEnabled,
+    dailyGoalPnl: settings.dailyGoalPnl,
     updateProfileName,
     updateChecklistItems,
     updateConfluenceTags,
     updateDailyReminder,
     updateWeeklySummary,
+    updateDailyGoalPnl,
   };
 }

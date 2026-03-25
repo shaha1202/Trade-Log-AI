@@ -4,17 +4,23 @@ import { router } from "expo-router";
 import React, { useCallback, useState } from "react";
 import {
   ActivityIndicator,
+  Dimensions,
   FlatList,
   Platform,
   Pressable,
   RefreshControl,
+  ScrollView,
   StyleSheet,
   Text,
   View,
 } from "react-native";
+import { G, Line, Polyline, Svg, Text as SvgText } from "react-native-svg";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import Colors from "@/constants/colors";
+import { useSettings } from "@/hooks/useSettings";
+
+const SCREEN_W = Dimensions.get("window").width;
 
 type Trade = {
   id: number;
@@ -115,7 +121,21 @@ function AIInsightCard({ tradeCount, refreshing }: { tradeCount: number; refresh
     }
   }, [refreshing, tradeCount, refetch]);
 
-  if (tradeCount < 3) return null;
+  if (tradeCount < 3) {
+    return (
+      <View style={[styles.insightCard, styles.insightCardLocked]}>
+        <View style={styles.insightHeader}>
+          <View style={styles.insightChip}>
+            <Feather name="cpu" size={10} color={Colors.teal} />
+            <Text style={styles.insightChipText}>AI Insight</Text>
+          </View>
+        </View>
+        <Text style={styles.insightLockedText}>
+          Log {3 - tradeCount} more {3 - tradeCount === 1 ? "trade" : "trades"} to unlock your first AI insight
+        </Text>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.insightCard}>
@@ -221,11 +241,7 @@ function StatsBar({ trades }: { trades: Trade[] }) {
 
   return (
     <View style={styles.statsBar}>
-      <StatItem
-        value={String(todayCount)}
-        label="Today"
-        context={countContext}
-      />
+      <StatItem value={String(todayCount)} label="Today" context={countContext} />
       <View style={styles.statDivider} />
       <StatItem
         value={todayWinRate != null ? `${todayWinRate.toFixed(0)}%` : "—"}
@@ -311,10 +327,342 @@ function StreakRow({ trades }: { trades: Trade[] }) {
   );
 }
 
+function SparklineCard({ trades }: { trades: Trade[] }) {
+  if (trades.length === 0) return null;
+
+  const now = new Date();
+  const days: { label: string; pnl: number; hasData: boolean }[] = [];
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date(now);
+    d.setDate(d.getDate() - i);
+    d.setHours(0, 0, 0, 0);
+    const key = d.toISOString().substring(0, 10);
+    const dayTrades = trades.filter((t) => t.createdAt.substring(0, 10) === key);
+    const pnl = dayTrades.reduce((s, t) => s + (t.pnl ?? 0), 0);
+    const dayLabel = i === 0 ? "Today" : d.toLocaleDateString([], { weekday: "short" });
+    days.push({ label: dayLabel, pnl, hasData: dayTrades.length > 0 });
+  }
+
+  const hasSomeData = days.some((d) => d.hasData);
+  if (!hasSomeData) return null;
+
+  const W = SCREEN_W - 32;
+  const H = 64;
+  const PAD_X = 28;
+  const PAD_Y = 10;
+  const innerW = W - PAD_X * 2;
+  const innerH = H - PAD_Y * 2;
+
+  const pnls = days.map((d) => d.pnl);
+  const maxAbs = Math.max(1, ...pnls.map(Math.abs));
+  const midY = PAD_Y + innerH / 2;
+
+  const points = days.map((d, i) => {
+    const x = PAD_X + (i / 6) * innerW;
+    const y = midY - (d.pnl / maxAbs) * (innerH / 2);
+    return { x, y, pnl: d.pnl, label: d.label, hasData: d.hasData };
+  });
+
+  const polylineStr = points.map((p) => `${p.x},${p.y}`).join(" ");
+  const netTrend = pnls[pnls.length - 1] - pnls[0];
+  const lineColor = netTrend >= 0 ? Colors.green : Colors.red;
+
+  return (
+    <View style={styles.sparkCard}>
+      <View style={styles.sparkHeader}>
+        <Text style={styles.sparkTitle}>7-Day P&L</Text>
+        <Text style={[styles.sparkNet, { color: lineColor }]}>
+          {netTrend >= 0 ? "+" : ""}{netTrend.toFixed(2)}
+        </Text>
+      </View>
+      <Svg width={W} height={H + 20}>
+        <G>
+          <Line x1={PAD_X} y1={midY} x2={W - PAD_X} y2={midY} stroke={Colors.border} strokeWidth={1} />
+          <Polyline
+            points={polylineStr}
+            fill="none"
+            stroke={lineColor}
+            strokeWidth={2}
+            strokeLinejoin="round"
+            strokeLinecap="round"
+          />
+          {points.map((p, i) => (
+            <G key={i}>
+              {p.hasData && (
+                <G>
+                  <G cx={p.x} cy={p.y} r={3} />
+                  <Line x1={p.x} y1={p.y - 3} x2={p.x} y2={p.y + 3} stroke={lineColor} strokeWidth={4} strokeLinecap="round" />
+                </G>
+              )}
+              <SvgText
+                x={p.x}
+                y={H + 16}
+                textAnchor="middle"
+                fontSize={9}
+                fill={Colors.textMuted}
+                fontFamily="Inter_400Regular"
+              >
+                {p.label}
+              </SvgText>
+            </G>
+          ))}
+        </G>
+      </Svg>
+    </View>
+  );
+}
+
+function CalendarHeatmap({ trades }: { trades: Trade[] }) {
+  if (trades.length === 0) return null;
+
+  const dayPnlMap = new Map<string, number>();
+  for (const t of trades) {
+    const key = t.createdAt.substring(0, 10);
+    dayPnlMap.set(key, (dayPnlMap.get(key) ?? 0) + (t.pnl ?? 0));
+  }
+
+  const today = new Date();
+  const year = today.getFullYear();
+  const month = today.getMonth();
+  const todayKey = today.toISOString().substring(0, 10);
+
+  const firstDay = new Date(year, month, 1);
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const startDow = (firstDay.getDay() + 6) % 7;
+
+  const monthName = firstDay.toLocaleDateString([], { month: "long", year: "numeric" });
+  const weekdays = ["M", "T", "W", "T", "F", "S", "S"];
+
+  const cells: { day: number | null; key: string | null }[] = [];
+  for (let i = 0; i < startDow; i++) cells.push({ day: null, key: null });
+  for (let d = 1; d <= daysInMonth; d++) {
+    const date = new Date(year, month, d);
+    const key = date.toISOString().substring(0, 10);
+    cells.push({ day: d, key });
+  }
+
+  const cellSize = Math.floor((SCREEN_W - 32 - 6 * 6) / 7);
+
+  function getCellStyle(key: string | null, day: number | null) {
+    if (!key || !day) return { backgroundColor: "transparent" };
+    const d = new Date(year, month, day);
+    const isToday = key === todayKey;
+    const isFuture = d > today;
+    const isWeekend = d.getDay() === 0 || d.getDay() === 6;
+    if (isFuture) {
+      return { backgroundColor: isWeekend ? Colors.bg : Colors.surface };
+    }
+    const pnl = dayPnlMap.get(key);
+    if (pnl == null) return { backgroundColor: isWeekend ? Colors.surface : Colors.surface2, borderWidth: isToday ? 1.5 : 0, borderColor: Colors.teal };
+    if (pnl > 0) return { backgroundColor: Colors.greenMuted, borderWidth: isToday ? 1.5 : 0, borderColor: isToday ? Colors.teal : Colors.green };
+    if (pnl < 0) return { backgroundColor: Colors.redMuted, borderWidth: isToday ? 1.5 : 0, borderColor: isToday ? Colors.teal : Colors.red };
+    return { backgroundColor: Colors.amberMuted, borderWidth: isToday ? 1.5 : 0, borderColor: isToday ? Colors.teal : Colors.amber };
+  }
+
+  function getCellTextColor(key: string | null, day: number | null) {
+    if (!key || !day) return "transparent";
+    const d = new Date(year, month, day);
+    const isFuture = d > today;
+    if (isFuture) return Colors.textMuted;
+    const pnl = dayPnlMap.get(key);
+    if (pnl == null) return Colors.textMuted;
+    if (pnl > 0) return Colors.green;
+    if (pnl < 0) return Colors.red;
+    return Colors.amber;
+  }
+
+  return (
+    <View style={styles.calCard}>
+      <View style={styles.calHeader}>
+        <Text style={styles.calTitle}>{monthName}</Text>
+        <View style={styles.calLegend}>
+          <View style={[styles.calDot, { backgroundColor: Colors.greenMuted }]} />
+          <Text style={styles.calLegendText}>Profit</Text>
+          <View style={[styles.calDot, { backgroundColor: Colors.redMuted }]} />
+          <Text style={styles.calLegendText}>Loss</Text>
+        </View>
+      </View>
+      <View style={styles.calGrid}>
+        {weekdays.map((wd, i) => (
+          <View key={i} style={[styles.calCell, { width: cellSize, height: 18 }]}>
+            <Text style={styles.calWeekday}>{wd}</Text>
+          </View>
+        ))}
+        {cells.map((cell, i) => (
+          <View
+            key={i}
+            style={[
+              styles.calCell,
+              { width: cellSize, height: cellSize },
+              getCellStyle(cell.key, cell.day),
+              { borderRadius: 6 },
+            ]}
+          >
+            {cell.day != null && (
+              <Text style={[styles.calDay, { color: getCellTextColor(cell.key, cell.day) }]}>
+                {cell.day}
+              </Text>
+            )}
+          </View>
+        ))}
+      </View>
+    </View>
+  );
+}
+
+function DailyGoalCard({ trades, goal }: { trades: Trade[]; goal: number }) {
+  if (goal <= 0) return null;
+
+  const todayStart = new Date();
+  todayStart.setHours(0, 0, 0, 0);
+  const todayTrades = trades.filter((t) => new Date(t.createdAt) >= todayStart);
+  const todayPnl = todayTrades.reduce((s, t) => s + (t.pnl ?? 0), 0);
+
+  const progress = Math.min(Math.max(todayPnl / goal, 0), 1);
+  const pct = Math.round(progress * 100);
+  const met = todayPnl >= goal;
+
+  const barColor = met ? Colors.green : progress >= 0.5 ? Colors.teal : Colors.amber;
+  const bgColor = met ? Colors.greenMuted : Colors.tealDim;
+  const borderColor = met ? Colors.green : Colors.teal;
+
+  return (
+    <View style={[styles.goalCard, { backgroundColor: bgColor, borderColor }]}>
+      <View style={styles.goalCardHeader}>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+          <Text style={styles.goalCardEmoji}>{met ? "✓" : "🎯"}</Text>
+          <Text style={[styles.goalCardTitle, { color: met ? Colors.green : Colors.teal }]}>
+            {met ? "Daily goal reached!" : "Daily Goal"}
+          </Text>
+        </View>
+        <Text style={[styles.goalCardPct, { color: met ? Colors.green : Colors.teal }]}>{pct}%</Text>
+      </View>
+      <View style={styles.goalBarBg}>
+        <View style={[styles.goalBarFill, { width: `${pct}%`, backgroundColor: barColor }]} />
+      </View>
+      <View style={styles.goalCardFooter}>
+        <Text style={styles.goalCardSub}>
+          {todayPnl >= 0 ? "+" : ""}{todayPnl.toFixed(2)} / ${goal.toFixed(0)}
+        </Text>
+        {!met && (
+          <Text style={styles.goalCardRemaining}>
+            ${(goal - todayPnl).toFixed(2)} to go
+          </Text>
+        )}
+      </View>
+    </View>
+  );
+}
+
+type BadgeDef = {
+  emoji: string;
+  label: string;
+  check: (trades: Trade[]) => boolean;
+};
+
+const BADGES: BadgeDef[] = [
+  {
+    emoji: "🏆",
+    label: "First Trade",
+    check: (t) => t.length >= 1,
+  },
+  {
+    emoji: "🔥",
+    label: "5-Day Streak",
+    check: (trades) => {
+      const dayMap = new Map<string, number>();
+      for (const t of trades) {
+        const key = t.createdAt.substring(0, 10);
+        dayMap.set(key, (dayMap.get(key) ?? 0) + (t.pnl ?? 0));
+      }
+      let streak = 0;
+      const cursor = new Date();
+      cursor.setHours(0, 0, 0, 0);
+      for (let i = 0; i < 365; i++) {
+        const key = cursor.toISOString().substring(0, 10);
+        const pnl = dayMap.get(key);
+        if (pnl != null && pnl > 0) { streak++; } else { break; }
+        cursor.setDate(cursor.getDate() - 1);
+      }
+      return streak >= 5;
+    },
+  },
+  {
+    emoji: "💎",
+    label: "Perfect Day",
+    check: (trades) => {
+      const dayMap = new Map<string, { wins: number; total: number }>();
+      for (const t of trades) {
+        const key = t.createdAt.substring(0, 10);
+        const d = dayMap.get(key) ?? { wins: 0, total: 0 };
+        d.total++;
+        if (t.result === "win") d.wins++;
+        dayMap.set(key, d);
+      }
+      return Array.from(dayMap.values()).some((d) => d.total >= 2 && d.wins === d.total);
+    },
+  },
+  {
+    emoji: "🎯",
+    label: "10 Wins",
+    check: (t) => t.filter((x) => x.result === "win").length >= 10,
+  },
+  {
+    emoji: "📈",
+    label: "Profitable Week",
+    check: (trades) => {
+      const weekMap = new Map<string, number>();
+      for (const t of trades) {
+        const d = new Date(t.createdAt);
+        const year = d.getFullYear();
+        const week = Math.floor((d.getTime() - new Date(year, 0, 1).getTime()) / (7 * 86400000));
+        const key = `${year}-${week}`;
+        weekMap.set(key, (weekMap.get(key) ?? 0) + (t.pnl ?? 0));
+      }
+      return Array.from(weekMap.values()).some((p) => p > 0);
+    },
+  },
+  {
+    emoji: "⚡",
+    label: "5R Day",
+    check: (t) => t.some((x) => (x.rr ?? 0) >= 5),
+  },
+];
+
+function BadgeRow({ trades }: { trades: Trade[] }) {
+  const badges = BADGES.map((b) => ({ ...b, unlocked: b.check(trades) }));
+
+  return (
+    <ScrollView
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      contentContainerStyle={styles.badgeScroll}
+    >
+      {badges.map((badge) => (
+        <View
+          key={badge.label}
+          style={[
+            styles.badgeChip,
+            badge.unlocked ? styles.badgeUnlocked : styles.badgeLocked,
+          ]}
+        >
+          <Text style={[styles.badgeEmoji, !badge.unlocked && styles.badgeEmojiLocked]}>
+            {badge.emoji}
+          </Text>
+          <Text style={[styles.badgeLabel, !badge.unlocked && styles.badgeLabelLocked]}>
+            {badge.label}
+          </Text>
+        </View>
+      ))}
+    </ScrollView>
+  );
+}
+
 export default function JournalScreen() {
   const insets = useSafeAreaInsets();
   const [refreshing, setRefreshing] = useState(false);
   const { data, refetch, isLoading } = useListTrades({});
+  const { dailyGoalPnl } = useSettings();
 
   const trades = (data?.trades ?? []) as Trade[];
 
@@ -339,21 +687,12 @@ export default function JournalScreen() {
         </Pressable>
       </View>
 
-      <AIInsightCard tradeCount={trades.length} refreshing={refreshing} />
-
-      {trades.length > 0 && <StatsBar trades={trades} />}
-
-      {trades.length > 0 && <StreakRow trades={trades} />}
-
       <FlatList
         data={trades}
         keyExtractor={(item) => String(item.id)}
         renderItem={({ item }) => <TradeCard trade={item} />}
-        contentContainerStyle={[
-          styles.list,
-          { paddingBottom: bottomPad },
-        ]}
-        scrollEnabled={!!trades.length}
+        contentContainerStyle={[styles.list, { paddingBottom: bottomPad }]}
+        scrollEnabled
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
@@ -361,6 +700,20 @@ export default function JournalScreen() {
             onRefresh={onRefresh}
             tintColor={Colors.teal}
           />
+        }
+        ListHeaderComponent={
+          <>
+            <AIInsightCard tradeCount={trades.length} refreshing={refreshing} />
+            {trades.length > 0 && <DailyGoalCard trades={trades} goal={dailyGoalPnl} />}
+            {trades.length > 0 && <StatsBar trades={trades} />}
+            {trades.length > 0 && <SparklineCard trades={trades} />}
+            {trades.length > 0 && <StreakRow trades={trades} />}
+            {trades.length > 0 && <BadgeRow trades={trades} />}
+            {trades.length > 0 && <CalendarHeatmap trades={trades} />}
+            {trades.length > 0 && (
+              <Text style={styles.sectionHeader}>Recent Trades</Text>
+            )}
+          </>
         }
         ListEmptyComponent={
           <View style={styles.empty}>
@@ -371,7 +724,7 @@ export default function JournalScreen() {
                 <Feather name="book-open" size={48} color={Colors.textMuted} />
                 <Text style={styles.emptyTitle}>No trades yet</Text>
                 <Text style={styles.emptyText}>
-                  Tap "Add Trade" to log your first trade
+                  Tap "+" to log your first trade
                 </Text>
               </>
             )}
@@ -407,15 +760,29 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
+  sectionHeader: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 13,
+    color: Colors.textSecondary,
+    letterSpacing: 0.5,
+    textTransform: "uppercase",
+    paddingHorizontal: 4,
+    marginTop: 8,
+    marginBottom: 6,
+  },
   insightCard: {
     marginHorizontal: 16,
-    marginBottom: 12,
+    marginBottom: 10,
     backgroundColor: Colors.tealDim,
     borderRadius: 16,
     borderWidth: 1,
     borderColor: Colors.teal,
     padding: 14,
     gap: 8,
+  },
+  insightCardLocked: {
+    backgroundColor: Colors.surface,
+    borderColor: Colors.border,
   },
   insightHeader: {
     flexDirection: "row",
@@ -454,6 +821,63 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: Colors.text,
     lineHeight: 20,
+  },
+  insightLockedText: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 13,
+    color: Colors.textMuted,
+    fontStyle: "italic",
+  },
+  goalCard: {
+    marginHorizontal: 16,
+    marginBottom: 10,
+    borderRadius: 16,
+    borderWidth: 1,
+    padding: 14,
+    gap: 10,
+  },
+  goalCardHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  goalCardEmoji: {
+    fontSize: 16,
+  },
+  goalCardTitle: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 14,
+  },
+  goalCardPct: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 18,
+    fontVariant: ["tabular-nums"],
+  },
+  goalBarBg: {
+    height: 6,
+    backgroundColor: Colors.surface3,
+    borderRadius: 3,
+    overflow: "hidden",
+  },
+  goalBarFill: {
+    height: 6,
+    borderRadius: 3,
+  },
+  goalCardFooter: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  goalCardSub: {
+    fontFamily: "Inter_500Medium",
+    fontSize: 13,
+    color: Colors.textSecondary,
+    fontVariant: ["tabular-nums"],
+  },
+  goalCardRemaining: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 11,
+    color: Colors.textMuted,
   },
   statsBar: {
     flexDirection: "row",
@@ -494,6 +918,32 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.border,
     alignSelf: "center",
   },
+  sparkCard: {
+    marginHorizontal: 16,
+    marginBottom: 10,
+    backgroundColor: Colors.surface,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    padding: 14,
+    paddingBottom: 4,
+  },
+  sparkHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 4,
+  },
+  sparkTitle: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 13,
+    color: Colors.textSecondary,
+  },
+  sparkNet: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 14,
+    fontVariant: ["tabular-nums"],
+  },
   streakRow: {
     flexDirection: "row",
     backgroundColor: Colors.surface,
@@ -531,6 +981,100 @@ const styles = StyleSheet.create({
     height: 36,
     backgroundColor: Colors.border,
     marginHorizontal: 8,
+  },
+  badgeScroll: {
+    paddingHorizontal: 16,
+    paddingBottom: 10,
+    gap: 8,
+    flexDirection: "row",
+  },
+  badgeChip: {
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 14,
+    borderWidth: 1,
+    minWidth: 76,
+  },
+  badgeUnlocked: {
+    backgroundColor: Colors.tealDim,
+    borderColor: Colors.teal,
+  },
+  badgeLocked: {
+    backgroundColor: Colors.surface,
+    borderColor: Colors.border,
+  },
+  badgeEmoji: {
+    fontSize: 22,
+  },
+  badgeEmojiLocked: {
+    opacity: 0.3,
+  },
+  badgeLabel: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 10,
+    color: Colors.teal,
+    textAlign: "center",
+  },
+  badgeLabelLocked: {
+    color: Colors.textMuted,
+  },
+  calCard: {
+    marginHorizontal: 16,
+    marginBottom: 10,
+    backgroundColor: Colors.surface,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    padding: 14,
+  },
+  calHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 10,
+  },
+  calTitle: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 14,
+    color: Colors.text,
+  },
+  calLegend: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  calDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  calLegendText: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 10,
+    color: Colors.textMuted,
+  },
+  calGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 6,
+  },
+  calCell: {
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  calWeekday: {
+    fontFamily: "Inter_500Medium",
+    fontSize: 10,
+    color: Colors.textMuted,
+    textAlign: "center",
+  },
+  calDay: {
+    fontFamily: "Inter_500Medium",
+    fontSize: 11,
+    textAlign: "center",
+    fontVariant: ["tabular-nums"],
   },
   list: {
     paddingHorizontal: 16,
