@@ -291,9 +291,9 @@ export default function OnboardingScreen() {
   }
 
   if (step === "result" && analysis) {
-    const dir = (analysis.direction ?? "long") as "long" | "short";
-    const dirColor = dir === "long" ? Colors.green : Colors.red;
-    const dirBg = dir === "long" ? Colors.greenMuted : Colors.redMuted;
+    const directionDisplay = analysis.direction
+      ? analysis.direction.toUpperCase()
+      : "—";
 
     return (
       <ScrollView
@@ -334,11 +334,9 @@ export default function OnboardingScreen() {
           </View>
 
           <DataRow label="Asset" value={analysis.asset ?? "—"} />
-          <DataRow label="Direction" value={dir.toUpperCase()} />
+          <DataRow label="Direction" value={directionDisplay} />
           <DataRow label="Timeframe" value={analysis.timeframe ?? "—"} />
-          {analysis.session ? (
-            <DataRow label="Session" value={analysis.session} />
-          ) : null}
+          <DataRow label="Session" value={analysis.session ?? "—"} />
           <DataRow
             label="Entry"
             value={analysis.entry != null ? String(analysis.entry) : "—"}
