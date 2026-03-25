@@ -203,10 +203,39 @@ export interface TradeAnalysis {
   narrative?: string | null;
 }
 
+export type TradeHighlightDirection =
+  (typeof TradeHighlightDirection)[keyof typeof TradeHighlightDirection];
+
+export const TradeHighlightDirection = {
+  long: "long",
+  short: "short",
+} as const;
+
+export interface TradeHighlight {
+  asset: string;
+  direction: TradeHighlightDirection;
+  pnl: number;
+}
+
 export interface MonthlyPnl {
   month: string;
   pnl: number;
   trades: number;
+}
+
+export interface DailyPnl {
+  date: string;
+  pnl: number;
+  trades: number;
+}
+
+export interface AssetBreakdown {
+  asset: string;
+  tradeCount: number;
+  winCount: number;
+  lossCount: number;
+  winRate: number;
+  totalPnl: number;
 }
 
 export interface TradeStats {
@@ -220,7 +249,11 @@ export interface TradeStats {
   bestTrade?: number | null;
   worstTrade?: number | null;
   profitFactor?: number | null;
+  bestTradeDetail?: TradeHighlight | null;
+  worstTradeDetail?: TradeHighlight | null;
   monthlyPnl: MonthlyPnl[];
+  dailyPnl: DailyPnl[];
+  assetBreakdown: AssetBreakdown[];
 }
 
 export interface AIInsightResponse {

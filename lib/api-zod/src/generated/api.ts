@@ -261,11 +261,42 @@ export const GetTradeStatsResponse = zod.object({
   bestTrade: zod.number().nullish(),
   worstTrade: zod.number().nullish(),
   profitFactor: zod.number().nullish(),
+  bestTradeDetail: zod
+    .object({
+      asset: zod.string(),
+      direction: zod.enum(["long", "short"]),
+      pnl: zod.number(),
+    })
+    .nullish(),
+  worstTradeDetail: zod
+    .object({
+      asset: zod.string(),
+      direction: zod.enum(["long", "short"]),
+      pnl: zod.number(),
+    })
+    .nullish(),
   monthlyPnl: zod.array(
     zod.object({
       month: zod.string(),
       pnl: zod.number(),
       trades: zod.number(),
+    }),
+  ),
+  dailyPnl: zod.array(
+    zod.object({
+      date: zod.string(),
+      pnl: zod.number(),
+      trades: zod.number(),
+    }),
+  ),
+  assetBreakdown: zod.array(
+    zod.object({
+      asset: zod.string(),
+      tradeCount: zod.number(),
+      winCount: zod.number(),
+      lossCount: zod.number(),
+      winRate: zod.number(),
+      totalPnl: zod.number(),
     }),
   ),
 });

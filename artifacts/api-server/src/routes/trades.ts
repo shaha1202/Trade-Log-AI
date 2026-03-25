@@ -86,8 +86,26 @@ router.get("/trades/stats/summary", async (req, res) => {
     const rrs = allTrades.filter((t) => t.rr).map((t) => parseFloat(t.rr!));
     const avgRr = rrs.length > 0 ? rrs.reduce((a, b) => a + b, 0) / rrs.length : 0;
 
-    const bestTrade = pnls.length > 0 ? Math.max(...pnls) : null;
-    const worstTrade = pnls.length > 0 ? Math.min(...pnls) : null;
+    const bestTradeValue = pnls.length > 0 ? Math.max(...pnls) : null;
+    const worstTradeValue = pnls.length > 0 ? Math.min(...pnls) : null;
+
+    const bestTradeRecord =
+      bestTradeValue != null
+        ? allTrades.find((t) => t.pnl != null && parseFloat(t.pnl) === bestTradeValue)
+        : null;
+    const worstTradeRecord =
+      worstTradeValue != null
+        ? allTrades.find((t) => t.pnl != null && parseFloat(t.pnl) === worstTradeValue)
+        : null;
+
+    const bestTradeDetail =
+      bestTradeRecord && bestTradeValue != null
+        ? { asset: bestTradeRecord.asset, direction: bestTradeRecord.direction, pnl: bestTradeValue }
+        : null;
+    const worstTradeDetail =
+      worstTradeRecord && worstTradeValue != null
+        ? { asset: worstTradeRecord.asset, direction: worstTradeRecord.direction, pnl: worstTradeValue }
+        : null;
 
     const grossProfit = pnls.filter((p) => p > 0).reduce((a, b) => a + b, 0);
     const grossLoss = Math.abs(pnls.filter((p) => p < 0).reduce((a, b) => a + b, 0));
@@ -106,6 +124,41 @@ router.get("/trades/stats/summary", async (req, res) => {
       .sort((a, b) => a[0].localeCompare(b[0]))
       .map(([month, data]) => ({ month, pnl: data.pnl, trades: data.trades }));
 
+    const dailyMap = new Map<string, { pnl: number; trades: number }>();
+    for (const t of allTrades) {
+      const key = `${t.createdAt.getFullYear()}-${String(t.createdAt.getMonth() + 1).padStart(2, "0")}-${String(t.createdAt.getDate()).padStart(2, "0")}`;
+      const existing = dailyMap.get(key) ?? { pnl: 0, trades: 0 };
+      existing.pnl += t.pnl ? parseFloat(t.pnl) : 0;
+      existing.trades += 1;
+      dailyMap.set(key, existing);
+    }
+
+    const dailyPnl = Array.from(dailyMap.entries())
+      .sort((a, b) => a[0].localeCompare(b[0]))
+      .map(([date, data]) => ({ date, pnl: data.pnl, trades: data.trades }));
+
+    const assetMap = new Map<string, { winCount: number; lossCount: number; totalPnl: number; tradeCount: number }>();
+    for (const t of allTrades) {
+      const key = t.asset;
+      const existing = assetMap.get(key) ?? { winCount: 0, lossCount: 0, totalPnl: 0, tradeCount: 0 };
+      existing.tradeCount += 1;
+      if (t.result === "win") existing.winCount += 1;
+      if (t.result === "loss") existing.lossCount += 1;
+      existing.totalPnl += t.pnl ? parseFloat(t.pnl) : 0;
+      assetMap.set(key, existing);
+    }
+
+    const assetBreakdown = Array.from(assetMap.entries())
+      .sort((a, b) => b[1].tradeCount - a[1].tradeCount)
+      .map(([asset, data]) => ({
+        asset,
+        tradeCount: data.tradeCount,
+        winCount: data.winCount,
+        lossCount: data.lossCount,
+        winRate: data.tradeCount > 0 ? data.winCount / data.tradeCount : 0,
+        totalPnl: data.totalPnl,
+      }));
+
     res.json({
       totalTrades,
       winCount,
@@ -114,10 +167,14 @@ router.get("/trades/stats/summary", async (req, res) => {
       winRate,
       totalPnl,
       avgRr,
-      bestTrade,
-      worstTrade,
+      bestTrade: bestTradeValue,
+      worstTrade: worstTradeValue,
       profitFactor,
+      bestTradeDetail,
+      worstTradeDetail,
       monthlyPnl,
+      dailyPnl,
+      assetBreakdown,
     });
   } catch (err) {
     req.log.error({ err }, "Failed to get trade stats");

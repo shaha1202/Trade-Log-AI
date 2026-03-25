@@ -605,10 +605,24 @@ components:
         profitFactor:
           type: number
           nullable: true
+        bestTradeDetail:
+          $ref: "#/components/schemas/TradeHighlight"
+          nullable: true
+        worstTradeDetail:
+          $ref: "#/components/schemas/TradeHighlight"
+          nullable: true
         monthlyPnl:
           type: array
           items:
             $ref: "#/components/schemas/MonthlyPnl"
+        dailyPnl:
+          type: array
+          items:
+            $ref: "#/components/schemas/DailyPnl"
+        assetBreakdown:
+          type: array
+          items:
+            $ref: "#/components/schemas/AssetBreakdown"
       required:
         - totalTrades
         - winCount
@@ -618,6 +632,23 @@ components:
         - totalPnl
         - avgRr
         - monthlyPnl
+        - dailyPnl
+        - assetBreakdown
+
+    TradeHighlight:
+      type: object
+      properties:
+        asset:
+          type: string
+        direction:
+          type: string
+          enum: [long, short]
+        pnl:
+          type: number
+      required:
+        - asset
+        - direction
+        - pnl
 
     MonthlyPnl:
       type: object
@@ -640,3 +671,40 @@ components:
           type: string
       required:
         - insight
+
+    DailyPnl:
+      type: object
+      properties:
+        date:
+          type: string
+        pnl:
+          type: number
+        trades:
+          type: integer
+      required:
+        - date
+        - pnl
+        - trades
+
+    AssetBreakdown:
+      type: object
+      properties:
+        asset:
+          type: string
+        tradeCount:
+          type: integer
+        winCount:
+          type: integer
+        lossCount:
+          type: integer
+        winRate:
+          type: number
+        totalPnl:
+          type: number
+      required:
+        - asset
+        - tradeCount
+        - winCount
+        - lossCount
+        - winRate
+        - totalPnl

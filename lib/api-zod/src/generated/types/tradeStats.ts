@@ -5,7 +5,10 @@
  * TradeLog API specification
  * OpenAPI spec version: 0.1.0
  */
+import type { AssetBreakdown } from "./assetBreakdown";
+import type { DailyPnl } from "./dailyPnl";
 import type { MonthlyPnl } from "./monthlyPnl";
+import type { TradeHighlight } from "./tradeHighlight";
 
 export interface TradeStats {
   totalTrades: number;
@@ -18,5 +21,9 @@ export interface TradeStats {
   bestTrade?: number | null;
   worstTrade?: number | null;
   profitFactor?: number | null;
+  bestTradeDetail?: TradeHighlight | null;
+  worstTradeDetail?: TradeHighlight | null;
   monthlyPnl: MonthlyPnl[];
+  dailyPnl: DailyPnl[];
+  assetBreakdown: AssetBreakdown[];
 }
