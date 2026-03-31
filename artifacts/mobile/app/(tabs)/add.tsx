@@ -545,17 +545,17 @@ export default function AddTradeScreen() {
                 style={[
                   styles.toggleBtn,
                   form.direction === "long" && {
-                    backgroundColor: Colors.greenMuted,
-                    borderColor: Colors.green,
+                    backgroundColor: Colors.blueMuted,
+                    borderColor: Colors.borderBlue,
                   },
                 ]}
                 onPress={() => { update("direction", "long"); Haptics.selectionAsync(); }}
               >
-                <Feather name="arrow-up" size={14} color={form.direction === "long" ? Colors.green : Colors.textMuted} />
+                <Feather name="arrow-up" size={14} color={form.direction === "long" ? Colors.blue : Colors.textMuted} />
                 <Text
                   style={[
                     styles.toggleText,
-                    form.direction === "long" && { color: Colors.green },
+                    form.direction === "long" && { color: Colors.blue },
                   ]}
                 >
                   LONG
@@ -565,17 +565,17 @@ export default function AddTradeScreen() {
                 style={[
                   styles.toggleBtn,
                   form.direction === "short" && {
-                    backgroundColor: Colors.redMuted,
-                    borderColor: Colors.red,
+                    backgroundColor: Colors.blueMuted,
+                    borderColor: Colors.borderBlue,
                   },
                 ]}
                 onPress={() => { update("direction", "short"); Haptics.selectionAsync(); }}
               >
-                <Feather name="arrow-down" size={14} color={form.direction === "short" ? Colors.red : Colors.textMuted} />
+                <Feather name="arrow-down" size={14} color={form.direction === "short" ? Colors.blue : Colors.textMuted} />
                 <Text
                   style={[
                     styles.toggleText,
-                    form.direction === "short" && { color: Colors.red },
+                    form.direction === "short" && { color: Colors.blue },
                   ]}
                 >
                   SHORT
@@ -673,18 +673,16 @@ export default function AddTradeScreen() {
           <Field label="Result">
             <View style={styles.resultRow}>
               {(["win", "loss", "breakeven"] as const).map((r) => {
-                const c = r === "win" ? Colors.green : r === "loss" ? Colors.red : Colors.amber;
-                const bg = r === "win" ? Colors.greenMuted : r === "loss" ? Colors.redMuted : Colors.amberMuted;
                 return (
                   <Pressable
                     key={r}
                     style={[
                       styles.resultBtn,
-                      form.result === r && { backgroundColor: bg, borderColor: c },
+                      form.result === r && { backgroundColor: Colors.blueMuted, borderColor: Colors.borderBlue },
                     ]}
                     onPress={() => { update("result", form.result === r ? "" : r); Haptics.selectionAsync(); }}
                   >
-                    <Text style={[styles.resultText, form.result === r && { color: c }]}>
+                    <Text style={[styles.resultText, form.result === r && { color: Colors.blue }]}>
                       {r.charAt(0).toUpperCase() + r.slice(1)}
                     </Text>
                   </Pressable>

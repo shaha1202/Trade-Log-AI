@@ -60,6 +60,10 @@ export default function SettingsScreen() {
   const [goalInput, setGoalInput] = useState(dailyGoalPnl > 0 ? String(dailyGoalPnl) : "");
   const [newChecklistItem, setNewChecklistItem] = useState("");
   const [newTag, setNewTag] = useState("");
+  const [nameFocused, setNameFocused] = useState(false);
+  const [goalFocused, setGoalFocused] = useState(false);
+  const [checklistFocused, setChecklistFocused] = useState(false);
+  const [tagFocused, setTagFocused] = useState(false);
 
   React.useEffect(() => {
     setNameInput(profileName);
@@ -155,8 +159,9 @@ export default function SettingsScreen() {
                   onChangeText={setNameInput}
                   placeholder="Enter your name..."
                   placeholderTextColor={Colors.textMuted}
-                  style={styles.textInput}
-                  onBlur={handleSaveName}
+                  style={[styles.textInput, nameFocused && styles.inputFocused]}
+                  onFocus={() => setNameFocused(true)}
+                  onBlur={() => { setNameFocused(false); handleSaveName(); }}
                   returnKeyType="done"
                   onSubmitEditing={handleSaveName}
                 />
@@ -174,9 +179,10 @@ export default function SettingsScreen() {
                   onChangeText={setGoalInput}
                   placeholder="0"
                   placeholderTextColor={Colors.textMuted}
-                  style={styles.goalInput}
+                  style={[styles.goalInput, goalFocused && { color: Colors.blue }]}
                   keyboardType="decimal-pad"
-                  onBlur={handleSaveGoal}
+                  onFocus={() => setGoalFocused(true)}
+                  onBlur={() => { setGoalFocused(false); handleSaveGoal(); }}
                   returnKeyType="done"
                   onSubmitEditing={handleSaveGoal}
                 />
@@ -235,7 +241,9 @@ export default function SettingsScreen() {
                 onChangeText={setNewChecklistItem}
                 placeholder="Add checklist item..."
                 placeholderTextColor={Colors.textMuted}
-                style={styles.addInput}
+                style={[styles.addInput, checklistFocused && styles.inputFocused]}
+                onFocus={() => setChecklistFocused(true)}
+                onBlur={() => setChecklistFocused(false)}
                 returnKeyType="done"
                 onSubmitEditing={handleAddChecklistItem}
               />
@@ -267,7 +275,9 @@ export default function SettingsScreen() {
                 onChangeText={setNewTag}
                 placeholder="Add confluence tag..."
                 placeholderTextColor={Colors.textMuted}
-                style={styles.addInput}
+                style={[styles.addInput, tagFocused && styles.inputFocused]}
+                onFocus={() => setTagFocused(true)}
+                onBlur={() => setTagFocused(false)}
                 returnKeyType="done"
                 onSubmitEditing={handleAddTag}
               />
@@ -395,6 +405,10 @@ const styles = StyleSheet.create({
     fontSize: 15,
     paddingHorizontal: 12,
     paddingVertical: 10,
+  },
+  inputFocused: {
+    borderColor: Colors.borderBlue,
+    backgroundColor: Colors.blueDim,
   },
   goalRow: {
     flexDirection: "row",
