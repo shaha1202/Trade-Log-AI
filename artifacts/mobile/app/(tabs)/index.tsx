@@ -575,47 +575,6 @@ type BadgeDef = {
 
 const BADGES: BadgeDef[] = [
   {
-    emoji: "🏆",
-    label: "First Trade",
-    check: (t) => t.length >= 1,
-  },
-  {
-    emoji: "🔥",
-    label: "5-Day Streak",
-    check: (trades) => {
-      const dayMap = new Map<string, number>();
-      for (const t of trades) {
-        const key = t.createdAt.substring(0, 10);
-        dayMap.set(key, (dayMap.get(key) ?? 0) + (t.pnl ?? 0));
-      }
-      let streak = 0;
-      const cursor = new Date();
-      cursor.setHours(0, 0, 0, 0);
-      for (let i = 0; i < 365; i++) {
-        const key = cursor.toISOString().substring(0, 10);
-        const pnl = dayMap.get(key);
-        if (pnl != null && pnl > 0) { streak++; } else { break; }
-        cursor.setDate(cursor.getDate() - 1);
-      }
-      return streak >= 5;
-    },
-  },
-  {
-    emoji: "💎",
-    label: "Perfect Day",
-    check: (trades) => {
-      const dayMap = new Map<string, { wins: number; total: number }>();
-      for (const t of trades) {
-        const key = t.createdAt.substring(0, 10);
-        const d = dayMap.get(key) ?? { wins: 0, total: 0 };
-        d.total++;
-        if (t.result === "win") d.wins++;
-        dayMap.set(key, d);
-      }
-      return Array.from(dayMap.values()).some((d) => d.total >= 2 && d.wins === d.total);
-    },
-  },
-  {
     emoji: "🎯",
     label: "10 Wins",
     check: (t) => t.filter((x) => x.result === "win").length >= 10,
