@@ -120,7 +120,7 @@ export default function PaywallScreen() {
         {BENEFITS.map((b) => (
           <View key={b.icon} style={styles.benefitRow}>
             <View style={styles.benefitIconWrap}>
-              <Feather name={b.icon as never} size={16} color={Colors.teal} />
+              <Feather name={b.icon as never} size={16} color={Colors.blue} />
             </View>
             <View style={styles.benefitText}>
               <Text style={styles.benefitTitle}>{b.title}</Text>
@@ -268,7 +268,7 @@ const styles = StyleSheet.create({
   benefitsTitle: {
     fontFamily: "Inter_700Bold",
     fontSize: 13,
-    color: Colors.teal,
+    color: Colors.blue,
     letterSpacing: 0.5,
     textTransform: "uppercase",
     marginBottom: 2,
@@ -282,9 +282,9 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 8,
-    backgroundColor: Colors.tealDim,
+    backgroundColor: Colors.blueDim,
     borderWidth: 1,
-    borderColor: Colors.teal,
+    borderColor: Colors.borderBlue,
     alignItems: "center",
     justifyContent: "center",
     flexShrink: 0,
@@ -329,8 +329,8 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
   },
   planCardSelected: {
-    borderColor: Colors.teal,
-    backgroundColor: Colors.tealDim,
+    borderColor: Colors.borderBlue,
+    backgroundColor: Colors.blueDim,
   },
   planCardYearly: {
     borderColor: Colors.amber,
@@ -366,13 +366,13 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   planRadioSelected: {
-    borderColor: Colors.teal,
+    borderColor: Colors.blue,
   },
   planRadioDot: {
     width: 10,
     height: 10,
     borderRadius: 5,
-    backgroundColor: Colors.teal,
+    backgroundColor: Colors.blue,
   },
   planLabel: {
     fontFamily: "Inter_600SemiBold",
@@ -380,7 +380,7 @@ const styles = StyleSheet.create({
     color: Colors.text,
   },
   planLabelSelected: {
-    color: Colors.teal,
+    color: Colors.blue,
   },
   planPeriodText: {
     fontFamily: "Inter_400Regular",
@@ -397,7 +397,7 @@ const styles = StyleSheet.create({
     color: Colors.text,
   },
   planPriceSelected: {
-    color: Colors.teal,
+    color: Colors.blue,
   },
   planPerMonth: {
     fontFamily: "Inter_400Regular",
@@ -410,10 +410,10 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     gap: 10,
-    backgroundColor: Colors.teal,
+    backgroundColor: Colors.blue,
     borderRadius: 16,
     paddingVertical: 16,
-    shadowColor: Colors.teal,
+    shadowColor: Colors.blue,
     shadowOpacity: 0.3,
     shadowRadius: 12,
     shadowOffset: { width: 0, height: 4 },
