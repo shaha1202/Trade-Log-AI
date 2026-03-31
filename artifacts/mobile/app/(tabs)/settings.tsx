@@ -371,7 +371,7 @@ export default function SettingsScreen() {
                 <Text style={styles.menuRowDesc}>Shows a progress bar on the Journal</Text>
               </View>
             </View>
-            <View style={[styles.goalInputWrap, { marginTop: 10, minWidth: 0 }]}>
+            <View style={[styles.goalInputWrap, { minWidth: 0 }]}>
               <Text style={styles.goalCurrency}>$</Text>
               <TextInput
                 value={goalInput}
