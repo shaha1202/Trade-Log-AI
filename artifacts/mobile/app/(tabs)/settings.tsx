@@ -361,22 +361,24 @@ export default function SettingsScreen() {
 
         {/* Profile settings */}
         <SectionGroup title="Profile">
-          <View style={[styles.menuRow, styles.menuRowBorder]}>
-            <View style={styles.menuRowIcon}>
-              <Feather name="target" size={18} color={Colors.blue} />
+          <View style={[styles.menuRow, styles.menuRowBorder, { flexDirection: "column", alignItems: "stretch" }]}>
+            <View style={{ flexDirection: "row", alignItems: "center" }}>
+              <View style={styles.menuRowIcon}>
+                <Feather name="target" size={18} color={Colors.blue} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.menuRowLabel}>Daily P&L Goal</Text>
+                <Text style={styles.menuRowDesc}>Shows a progress bar on the Journal</Text>
+              </View>
             </View>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.menuRowLabel}>Daily P&L Goal</Text>
-              <Text style={styles.menuRowDesc}>Shows a progress bar on the Journal</Text>
-            </View>
-            <View style={styles.goalInputWrap}>
+            <View style={[styles.goalInputWrap, { marginTop: 10, minWidth: 0 }]}>
               <Text style={styles.goalCurrency}>$</Text>
               <TextInput
                 value={goalInput}
                 onChangeText={setGoalInput}
                 placeholder="0"
                 placeholderTextColor={Colors.textMuted}
-                style={[styles.goalInput, goalFocused && { color: Colors.blue }]}
+                style={[styles.goalInput, { flex: 1 }, goalFocused && { color: Colors.blue }]}
                 keyboardType="decimal-pad"
                 onFocus={() => setGoalFocused(true)}
                 onBlur={() => { setGoalFocused(false); handleSaveGoal(); }}
