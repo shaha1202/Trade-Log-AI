@@ -1,0 +1,710 @@
+openapi: 3.1.0
+info:
+  title: Api
+  version: 0.1.0
+  description: TradeLog API specification
+servers:
+  - url: /api
+    description: Base API path
+tags:
+  - name: health
+    description: Health operations
+  - name: trades
+    description: Trade journal operations
+paths:
+  /healthz:
+    get:
+      operationId: healthCheck
+      tags: [health]
+      summary: Health check
+      description: Returns server health status
+      responses:
+        "200":
+          description: Healthy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthStatus"
+
+  /trades:
+    get:
+      operationId: listTrades
+      tags: [trades]
+      summary: List all trades
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 100
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+        - name: result
+          in: query
+          schema:
+            type: string
+            enum: [win, loss, breakeven]
+      responses:
+        "200":
+          description: List of trades
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TradeListResponse"
+    post:
+      operationId: createTrade
+      tags: [trades]
+      summary: Create a new trade
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateTradeRequest"
+      responses:
+        "201":
+          description: Trade created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Trade"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /trades/analyze:
+    post:
+      operationId: analyzeTrade
+      tags: [trades]
+      summary: Analyze a chart screenshot with AI
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AnalyzeTradeRequest"
+      responses:
+        "200":
+          description: AI analysis result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TradeAnalysis"
+        "400":
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: AI analysis failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /trades/{id}:
+    get:
+      operationId: getTrade
+      tags: [trades]
+      summary: Get a single trade
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Trade found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Trade"
+        "404":
+          description: Trade not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    patch:
+      operationId: updateTrade
+      tags: [trades]
+      summary: Update a trade
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateTradeRequest"
+      responses:
+        "200":
+          description: Trade updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Trade"
+        "404":
+          description: Trade not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    delete:
+      operationId: deleteTrade
+      tags: [trades]
+      summary: Delete a trade
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Trade deleted
+        "404":
+          description: Trade not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /trades/ai-insight:
+    get:
+      operationId: getAiInsight
+      tags: [trades]
+      summary: Get AI-generated insight from recent trades
+      responses:
+        "200":
+          description: AI insight
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AIInsightResponse"
+        "500":
+          description: AI error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /trades/stats/summary:
+    get:
+      operationId: getTradeStats
+      tags: [trades]
+      summary: Get aggregate trade statistics
+      responses:
+        "200":
+          description: Trade statistics
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TradeStats"
+
+components:
+  schemas:
+    HealthStatus:
+      type: object
+      properties:
+        status:
+          type: string
+      required:
+        - status
+
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+        message:
+          type: string
+      required:
+        - error
+
+    Trade:
+      type: object
+      properties:
+        id:
+          type: integer
+        asset:
+          type: string
+        timeframe:
+          type: string
+        session:
+          type: string
+          nullable: true
+        direction:
+          type: string
+          enum: [long, short]
+        entry:
+          type: number
+          nullable: true
+        stopLoss:
+          type: number
+          nullable: true
+        takeProfit:
+          type: number
+          nullable: true
+        rr:
+          type: number
+          nullable: true
+        lotSize:
+          type: number
+          nullable: true
+        riskPct:
+          type: number
+          nullable: true
+        pnl:
+          type: number
+          nullable: true
+        holdDuration:
+          type: string
+          nullable: true
+        result:
+          type: string
+          enum: [win, loss, breakeven]
+          nullable: true
+        htfTrend:
+          type: string
+          nullable: true
+        confluences:
+          type: array
+          items:
+            type: string
+        aiNarrative:
+          type: string
+          nullable: true
+        checklistDirectionAligned:
+          type: boolean
+          nullable: true
+        checklistMinConfluences:
+          type: boolean
+          nullable: true
+        checklistRr:
+          type: boolean
+          nullable: true
+        checklistRisk:
+          type: boolean
+          nullable: true
+        checklistSlStructure:
+          type: boolean
+          nullable: true
+        checklistCalendar:
+          type: boolean
+          nullable: true
+        moodTags:
+          type: array
+          items:
+            type: string
+        planAdherence:
+          type: integer
+          nullable: true
+        didWell:
+          type: string
+          nullable: true
+        toImprove:
+          type: string
+          nullable: true
+        screenshotUrl:
+          type: string
+          nullable: true
+        aiAnalyzed:
+          type: boolean
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+      required:
+        - id
+        - asset
+        - timeframe
+        - direction
+        - confluences
+        - moodTags
+        - aiAnalyzed
+        - createdAt
+        - updatedAt
+
+    CreateTradeRequest:
+      type: object
+      properties:
+        asset:
+          type: string
+        timeframe:
+          type: string
+        session:
+          type: string
+          nullable: true
+        direction:
+          type: string
+          enum: [long, short]
+        entry:
+          type: number
+          nullable: true
+        stopLoss:
+          type: number
+          nullable: true
+        takeProfit:
+          type: number
+          nullable: true
+        rr:
+          type: number
+          nullable: true
+        lotSize:
+          type: number
+          nullable: true
+        riskPct:
+          type: number
+          nullable: true
+        pnl:
+          type: number
+          nullable: true
+        holdDuration:
+          type: string
+          nullable: true
+        result:
+          type: string
+          enum: [win, loss, breakeven]
+          nullable: true
+        htfTrend:
+          type: string
+          nullable: true
+        confluences:
+          type: array
+          items:
+            type: string
+        aiNarrative:
+          type: string
+          nullable: true
+        checklistDirectionAligned:
+          type: boolean
+          nullable: true
+        checklistMinConfluences:
+          type: boolean
+          nullable: true
+        checklistRr:
+          type: boolean
+          nullable: true
+        checklistRisk:
+          type: boolean
+          nullable: true
+        checklistSlStructure:
+          type: boolean
+          nullable: true
+        checklistCalendar:
+          type: boolean
+          nullable: true
+        moodTags:
+          type: array
+          items:
+            type: string
+        planAdherence:
+          type: integer
+          nullable: true
+        didWell:
+          type: string
+          nullable: true
+        toImprove:
+          type: string
+          nullable: true
+        screenshotUrl:
+          type: string
+          nullable: true
+        aiAnalyzed:
+          type: boolean
+      required:
+        - asset
+        - timeframe
+        - direction
+        - confluences
+        - moodTags
+        - aiAnalyzed
+
+    UpdateTradeRequest:
+      type: object
+      properties:
+        asset:
+          type: string
+        timeframe:
+          type: string
+        session:
+          type: string
+          nullable: true
+        direction:
+          type: string
+          enum: [long, short]
+        entry:
+          type: number
+          nullable: true
+        stopLoss:
+          type: number
+          nullable: true
+        takeProfit:
+          type: number
+          nullable: true
+        rr:
+          type: number
+          nullable: true
+        lotSize:
+          type: number
+          nullable: true
+        riskPct:
+          type: number
+          nullable: true
+        pnl:
+          type: number
+          nullable: true
+        holdDuration:
+          type: string
+          nullable: true
+        result:
+          type: string
+          enum: [win, loss, breakeven]
+          nullable: true
+        htfTrend:
+          type: string
+          nullable: true
+        confluences:
+          type: array
+          items:
+            type: string
+        aiNarrative:
+          type: string
+          nullable: true
+        checklistDirectionAligned:
+          type: boolean
+          nullable: true
+        checklistMinConfluences:
+          type: boolean
+          nullable: true
+        checklistRr:
+          type: boolean
+          nullable: true
+        checklistRisk:
+          type: boolean
+          nullable: true
+        checklistSlStructure:
+          type: boolean
+          nullable: true
+        checklistCalendar:
+          type: boolean
+          nullable: true
+        moodTags:
+          type: array
+          items:
+            type: string
+        planAdherence:
+          type: integer
+          nullable: true
+        didWell:
+          type: string
+          nullable: true
+        toImprove:
+          type: string
+          nullable: true
+        screenshotUrl:
+          type: string
+          nullable: true
+        aiAnalyzed:
+          type: boolean
+
+    TradeListResponse:
+      type: object
+      properties:
+        trades:
+          type: array
+          items:
+            $ref: "#/components/schemas/Trade"
+        total:
+          type: integer
+      required:
+        - trades
+        - total
+
+    AnalyzeTradeRequest:
+      type: object
+      properties:
+        imageBase64:
+          type: string
+        mediaType:
+          type: string
+          enum: [image/jpeg, image/png, image/gif, image/webp]
+      required:
+        - imageBase64
+        - mediaType
+
+    TradeAnalysis:
+      type: object
+      properties:
+        asset:
+          type: string
+          nullable: true
+        timeframe:
+          type: string
+          nullable: true
+        session:
+          type: string
+          nullable: true
+        direction:
+          type: string
+          enum: [long, short]
+          nullable: true
+        entry:
+          type: number
+          nullable: true
+        stopLoss:
+          type: number
+          nullable: true
+        takeProfit:
+          type: number
+          nullable: true
+        htfTrend:
+          type: string
+          nullable: true
+        narrative:
+          type: string
+          nullable: true
+      required: []
+
+    TradeStats:
+      type: object
+      properties:
+        totalTrades:
+          type: integer
+        winCount:
+          type: integer
+        lossCount:
+          type: integer
+        breakevenCount:
+          type: integer
+        winRate:
+          type: number
+        totalPnl:
+          type: number
+        avgRr:
+          type: number
+        bestTrade:
+          type: number
+          nullable: true
+        worstTrade:
+          type: number
+          nullable: true
+        profitFactor:
+          type: number
+          nullable: true
+        bestTradeDetail:
+          $ref: "#/components/schemas/TradeHighlight"
+          nullable: true
+        worstTradeDetail:
+          $ref: "#/components/schemas/TradeHighlight"
+          nullable: true
+        monthlyPnl:
+          type: array
+          items:
+            $ref: "#/components/schemas/MonthlyPnl"
+        dailyPnl:
+          type: array
+          items:
+            $ref: "#/components/schemas/DailyPnl"
+        assetBreakdown:
+          type: array
+          items:
+            $ref: "#/components/schemas/AssetBreakdown"
+      required:
+        - totalTrades
+        - winCount
+        - lossCount
+        - breakevenCount
+        - winRate
+        - totalPnl
+        - avgRr
+        - monthlyPnl
+        - dailyPnl
+        - assetBreakdown
+
+    TradeHighlight:
+      type: object
+      properties:
+        asset:
+          type: string
+        direction:
+          type: string
+          enum: [long, short]
+        pnl:
+          type: number
+      required:
+        - asset
+        - direction
+        - pnl
+
+    MonthlyPnl:
+      type: object
+      properties:
+        month:
+          type: string
+        pnl:
+          type: number
+        trades:
+          type: integer
+      required:
+        - month
+        - pnl
+        - trades
+
+    AIInsightResponse:
+      type: object
+      properties:
+        insight:
+          type: string
+      required:
+        - insight
+
+    DailyPnl:
+      type: object
+      properties:
+        date:
+          type: string
+        pnl:
+          type: number
+        trades:
+          type: integer
+      required:
+        - date
+        - pnl
+        - trades
+
+    AssetBreakdown:
+      type: object
+      properties:
+        asset:
+          type: string
+        tradeCount:
+          type: integer
+        winCount:
+          type: integer
+        lossCount:
+          type: integer
+        winRate:
+          type: number
+        totalPnl:
+          type: number
+      required:
+        - asset
+        - tradeCount
+        - winCount
+        - lossCount
+        - winRate
+        - totalPnl

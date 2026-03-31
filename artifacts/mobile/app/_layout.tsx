@@ -1,0 +1,135 @@
+import {
+  Inter_400Regular,
+  Inter_500Medium,
+  Inter_600SemiBold,
+  Inter_700Bold,
+  useFonts,
+} from "@expo-google-fonts/inter";
+import { Feather } from "@expo/vector-icons";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { listTrades, setBaseUrl } from "@workspace/api-client-react";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { router, Stack } from "expo-router";
+import * as SplashScreen from "expo-splash-screen";
+import React, { useEffect, useRef } from "react";
+import { GestureHandlerRootView } from "react-native-gesture-handler";
+import { KeyboardProvider } from "react-native-keyboard-controller";
+import { SafeAreaProvider } from "react-native-safe-area-context";
+
+import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { ONBOARDING_KEY } from "@/constants/storage";
+
+// API base URL strategy:
+// - Native (iOS/Android): absolute URL to the public domain so the device
+//   can reach the server over the internet.
+// - Web on localhost: relative URLs (null) so the request goes through the
+//   local dev proxy (port 5000) which forwards /api/* to Express.
+// - Web on any other domain (e.g. expo.pike.replit.dev): absolute URL to
+//   the public domain; Express's open CORS policy allows the cross-origin
+//   request.
+const isWebLocalhost =
+  typeof window !== "undefined" && window.location.hostname === "localhost";
+
+if (isWebLocalhost) {
+  setBaseUrl(null);
+} else {
+  setBaseUrl(`https://${process.env.EXPO_PUBLIC_DOMAIN}`);
+}
+
+SplashScreen.preventAutoHideAsync();
+
+const queryClient = new QueryClient();
+
+function OnboardingGuard() {
+  const checked = useRef(false);
+
+  useEffect(() => {
+    if (checked.current) return;
+    checked.current = true;
+
+    async function check() {
+      try {
+        const done = await AsyncStorage.getItem(ONBOARDING_KEY);
+        if (done) return;
+
+        const data = await listTrades();
+        const tradeCount = data?.trades?.length ?? 0;
+        if (tradeCount === 0) {
+          router.replace("/onboarding");
+        }
+      } catch {
+        // If the fetch fails, don't block the user — just show the journal
+      }
+    }
+
+    check();
+  }, []);
+
+  return null;
+}
+
+function RootLayoutNav() {
+  return (
+    <>
+      <OnboardingGuard />
+      <Stack screenOptions={{ headerShown: false }}>
+        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+        <Stack.Screen
+          name="onboarding"
+          options={{
+            headerShown: false,
+            presentation: "fullScreenModal",
+            gestureEnabled: false,
+          }}
+        />
+        <Stack.Screen
+          name="paywall"
+          options={{
+            headerShown: false,
+            presentation: "fullScreenModal",
+            gestureEnabled: false,
+          }}
+        />
+        <Stack.Screen
+          name="trade/[id]"
+          options={{
+            headerShown: false,
+            presentation: "card",
+          }}
+        />
+      </Stack>
+    </>
+  );
+}
+
+export default function RootLayout() {
+  const [fontsLoaded, fontError] = useFonts({
+    Inter_400Regular,
+    Inter_500Medium,
+    Inter_600SemiBold,
+    Inter_700Bold,
+    ...Feather.font,
+  });
+
+  useEffect(() => {
+    if (fontsLoaded || fontError) {
+      SplashScreen.hideAsync();
+    }
+  }, [fontsLoaded, fontError]);
+
+  if (!fontsLoaded && !fontError) return null;
+
+  return (
+    <SafeAreaProvider>
+      <ErrorBoundary>
+        <QueryClientProvider client={queryClient}>
+          <GestureHandlerRootView style={{ flex: 1 }}>
+            <KeyboardProvider>
+              <RootLayoutNav />
+            </KeyboardProvider>
+          </GestureHandlerRootView>
+        </QueryClientProvider>
+      </ErrorBoundary>
+    </SafeAreaProvider>
+  );
+}
