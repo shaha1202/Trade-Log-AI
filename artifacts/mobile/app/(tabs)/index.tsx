@@ -567,68 +567,6 @@ function DailyGoalCard({ trades, goal }: { trades: Trade[]; goal: number }) {
   );
 }
 
-type BadgeDef = {
-  emoji: string;
-  label: string;
-  check: (trades: Trade[]) => boolean;
-};
-
-const BADGES: BadgeDef[] = [
-  {
-    emoji: "🎯",
-    label: "10 Wins",
-    check: (t) => t.filter((x) => x.result === "win").length >= 10,
-  },
-  {
-    emoji: "📈",
-    label: "Profitable Week",
-    check: (trades) => {
-      const weekMap = new Map<string, number>();
-      for (const t of trades) {
-        const d = new Date(t.createdAt);
-        const year = d.getFullYear();
-        const week = Math.floor((d.getTime() - new Date(year, 0, 1).getTime()) / (7 * 86400000));
-        const key = `${year}-${week}`;
-        weekMap.set(key, (weekMap.get(key) ?? 0) + (t.pnl ?? 0));
-      }
-      return Array.from(weekMap.values()).some((p) => p > 0);
-    },
-  },
-  {
-    emoji: "⚡",
-    label: "5R Day",
-    check: (t) => t.some((x) => (x.rr ?? 0) >= 5),
-  },
-];
-
-function BadgeRow({ trades }: { trades: Trade[] }) {
-  const badges = BADGES.map((b) => ({ ...b, unlocked: b.check(trades) }));
-
-  return (
-    <ScrollView
-      horizontal
-      showsHorizontalScrollIndicator={false}
-      contentContainerStyle={styles.badgeScroll}
-    >
-      {badges.map((badge) => (
-        <View
-          key={badge.label}
-          style={[
-            styles.badgeChip,
-            badge.unlocked ? styles.badgeUnlocked : styles.badgeLocked,
-          ]}
-        >
-          <Text style={[styles.badgeEmoji, !badge.unlocked && styles.badgeEmojiLocked]}>
-            {badge.emoji}
-          </Text>
-          <Text style={[styles.badgeLabel, !badge.unlocked && styles.badgeLabelLocked]}>
-            {badge.label}
-          </Text>
-        </View>
-      ))}
-    </ScrollView>
-  );
-}
 
 export default function JournalScreen() {
   const insets = useSafeAreaInsets();
@@ -686,7 +624,6 @@ export default function JournalScreen() {
             {trades.length > 0 && <StatsBar trades={trades} />}
             <SparklineCard trades={trades} />
             {trades.length > 0 && <StreakRow trades={trades} />}
-            <BadgeRow trades={trades} />
             <CalendarHeatmap trades={trades} />
             {trades.length > 0 && (
               <Text style={styles.sectionHeader}>Recent Trades</Text>
@@ -955,43 +892,6 @@ const styles = StyleSheet.create({
     height: 36,
     backgroundColor: Colors.border,
     marginHorizontal: 8,
-  },
-  badgeScroll: {
-    paddingBottom: 10,
-    gap: 8,
-    flexDirection: "row",
-  },
-  badgeChip: {
-    alignItems: "center",
-    gap: 4,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: 14,
-    borderWidth: 1,
-    minWidth: 76,
-  },
-  badgeUnlocked: {
-    backgroundColor: Colors.blueDim,
-    borderColor: Colors.borderBlue,
-  },
-  badgeLocked: {
-    backgroundColor: Colors.surface,
-    borderColor: Colors.border,
-  },
-  badgeEmoji: {
-    fontSize: 22,
-  },
-  badgeEmojiLocked: {
-    opacity: 0.3,
-  },
-  badgeLabel: {
-    fontFamily: "Inter_600SemiBold",
-    fontSize: 10,
-    color: Colors.blue,
-    textAlign: "center",
-  },
-  badgeLabelLocked: {
-    color: Colors.textMuted,
   },
   calCard: {
     marginBottom: 10,
