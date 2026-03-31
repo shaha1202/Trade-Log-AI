@@ -53,7 +53,7 @@ function BarChart({ data }: { data: ChartItem[] }) {
                       {
                         height: Math.max(barH, 2),
                         width: barWidth,
-                        backgroundColor: Colors.green,
+                        backgroundColor: Colors.blue,
                         alignSelf: "flex-end",
                         borderRadius: 4,
                       },

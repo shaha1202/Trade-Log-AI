@@ -372,7 +372,7 @@ function SparklineCard({ trades }: { trades: Trade[] }) {
 
   const polylineStr = points.map((p) => `${p.x},${p.y}`).join(" ");
   const netTrend = cumulativePnls[cumulativePnls.length - 1];
-  const lineColor = netTrend > 0 ? Colors.blue : netTrend < 0 ? Colors.red : Colors.textMuted;
+  const lineColor = Colors.blue;
 
   return (
     <View style={styles.sparkCard}>
@@ -1110,7 +1110,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: Colors.borderBlue,
   },
   cardLeft: {
     flex: 1,

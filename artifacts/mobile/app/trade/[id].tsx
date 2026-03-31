@@ -507,7 +507,7 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.surface2,
   },
   checkRowActive: {
-    backgroundColor: Colors.greenMuted,
+    backgroundColor: Colors.blueDim,
   },
   checkbox: {
     width: 20,
@@ -519,8 +519,8 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   checkboxActive: {
-    backgroundColor: Colors.green,
-    borderColor: Colors.green,
+    backgroundColor: Colors.blue,
+    borderColor: Colors.blue,
   },
   checkLabel: {
     fontFamily: "Inter_400Regular",

@@ -175,7 +175,7 @@ function Section({ title, children }: { title: string; children: React.ReactNode
   return (
     <View style={styles.section}>
       <Text style={styles.sectionTitle}>{title}</Text>
-      {children}
+      <View style={styles.sectionCard}>{children}</View>
     </View>
   );
 }
@@ -858,6 +858,13 @@ const styles = StyleSheet.create({
   },
   section: {
     marginBottom: 24,
+  },
+  sectionCard: {
+    backgroundColor: Colors.surface,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    padding: 14,
   },
   sectionTitle: {
     fontFamily: "Inter_600SemiBold",
